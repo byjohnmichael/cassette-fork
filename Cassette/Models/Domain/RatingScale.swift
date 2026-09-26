@@ -26,17 +26,24 @@ nonisolated enum RatingScale {
         normalized(value).formatted(.number.precision(.fractionLength(1)))
     }
 
-    /// A short verdict shown under the dial.
+    /// A short verdict shown under the dial. The two ends of the scale — exactly 0.0 and exactly
+    /// 10.0 — get their own words.
     static func verdict(for value: Double) -> String {
         switch normalized(value) {
-        case ..<2:    String(localized: "Unlistenable")
-        case ..<4:    String(localized: "Not For Me")
-        case ..<5.5:  String(localized: "Mixed Feelings")
+        case ...0:    String(localized: "Rock Bottom")
+        case ..<1:    String(localized: "Unlistenable")
+        case ..<2:    String(localized: "Bad")
+        case ..<3:    String(localized: "Weak")
+        case ..<4.5:  String(localized: "Forgettable")
+        case ..<5.5:  String(localized: "Average")
         case ..<7:    String(localized: "Decent")
-        case ..<8:    String(localized: "Good")
-        case ..<9:    String(localized: "Great")
-        case ..<9.7:  String(localized: "Excellent")
-        default:      String(localized: "Masterpiece")
+        case ..<7.5:  String(localized: "Good")
+        case ..<8:    String(localized: "Great")
+        case ..<8.5:  String(localized: "Excellent")
+        case ..<9:    String(localized: "Exceptional")
+        case ..<9.6:  String(localized: "Must Listen")
+        case ..<10:   String(localized: "Masterpiece")
+        default:      String(localized: "Unmatched")
         }
     }
 }

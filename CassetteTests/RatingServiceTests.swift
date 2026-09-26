@@ -18,6 +18,21 @@ struct RatingScaleTests {
         #expect(RatingScale.normalized(7.46) == 7.5)
         #expect(RatingScale.normalized(.nan) == RatingScale.defaultValue)
     }
+
+    @Test func verdict_coversEveryBandAtItsEdges() {
+        let expected: [(Double, String)] = [
+            (0, "Rock Bottom"), (0.1, "Unlistenable"), (0.9, "Unlistenable"),
+            (1, "Bad"), (1.9, "Bad"), (2, "Weak"), (2.9, "Weak"),
+            (3, "Forgettable"), (4.4, "Forgettable"), (4.5, "Average"), (5.4, "Average"),
+            (5.5, "Decent"), (6.9, "Decent"), (7, "Good"), (7.4, "Good"),
+            (7.5, "Great"), (7.9, "Great"), (8, "Excellent"), (8.4, "Excellent"),
+            (8.5, "Exceptional"), (8.9, "Exceptional"), (9, "Must Listen"), (9.5, "Must Listen"),
+            (9.6, "Masterpiece"), (9.9, "Masterpiece"), (10, "Unmatched"),
+        ]
+        for (value, label) in expected {
+            #expect(RatingScale.verdict(for: value) == label, "\(value)")
+        }
+    }
 }
 
 @Suite("RatingService")
