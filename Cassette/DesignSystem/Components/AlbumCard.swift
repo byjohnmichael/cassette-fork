@@ -18,11 +18,14 @@ struct AlbumCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: CassetteSpacing.xs) {
             CoverArtCard(id: album.coverArt ?? album.id, size: cardSize)
-            Text(album.name)
-                .font(.cassetteCaption)
-                .fontWeight(.semibold)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            HStack(spacing: CassetteSpacing.xs) {
+                Text(album.name)
+                    .font(.cassetteCaption)
+                    .fontWeight(.semibold)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                ItemRatingBadge(itemType: .album, itemId: album.id)
+            }
             if let artist = album.artist {
                 Text(artist)
                     .font(.cassetteCaption)

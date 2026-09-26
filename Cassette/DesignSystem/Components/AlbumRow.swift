@@ -22,10 +22,13 @@ struct AlbumRow: View {
             CoverArtCard(id: coverArtId ?? albumId, size: 56)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(name)
-                    .font(.cassetteCellTitle)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                HStack(spacing: CassetteSpacing.xs) {
+                    Text(name)
+                        .font(.cassetteCellTitle)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    ItemRatingBadge(itemType: .album, itemId: albumId)
+                }
                 if let artist {
                     Text(artist)
                         .font(.cassetteCellSubtitle)

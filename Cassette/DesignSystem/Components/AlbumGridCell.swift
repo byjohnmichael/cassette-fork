@@ -31,10 +31,13 @@ struct AlbumGridCell: View {
             .onHover { isHovered = $0 }
             #endif
 
-            Text(album.name)
-                .font(.cassetteCellTitle)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: CassetteSpacing.xs) {
+                Text(album.name)
+                    .font(.cassetteCellTitle)
+                    .lineLimit(1)
+                ItemRatingBadge(itemType: .album, itemId: album.id)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if let artist = album.artist {
                 Text(artist)

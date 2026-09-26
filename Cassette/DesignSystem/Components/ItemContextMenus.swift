@@ -113,6 +113,7 @@ struct SongContextMenuModifier: ViewModifier {
     let coverImage: PlatformImage?
 
     @Environment(\.appContainer) private var container
+    @State private var ratingTarget: RatingTarget?
 
     private var isFavorite: Bool {
         container?.favoritesService.isFavorite(itemType: .song, itemId: song.id) == true
@@ -167,9 +168,14 @@ struct SongContextMenuModifier: ViewModifier {
                     systemImage: isFavorite ? "star.slash" : "star"
                 )
             }
+
+            RateMenuButton(itemType: .song, itemId: song.id) {
+                ratingTarget = RatingTarget(itemType: .song, itemId: song.id, title: song.title, subtitle: song.artist ?? "")
+            }
         } preview: {
             SongContextPreview(coverImage: coverImage, song: song)
         }
+        .ratingSheet(target: $ratingTarget)
     }
 }
 
@@ -193,6 +199,7 @@ struct CollectionContextMenuModifier: ViewModifier {
 
     @Environment(\.appContainer) private var container
     @State private var showPinLimitAlert = false
+    @State private var ratingTarget: RatingTarget?
 
     private var isPinned: Bool {
         container?.pinService.isPinned(itemType: itemType, itemId: itemId) == true
@@ -308,6 +315,13 @@ struct CollectionContextMenuModifier: ViewModifier {
                     }
                 }
 
+                // Subsonic rates songs, albums and artists — not playlists.
+                if itemType == .album {
+                    RateMenuButton(itemType: .album, itemId: itemId) {
+                        ratingTarget = RatingTarget(itemType: .album, itemId: itemId, title: displayName, subtitle: displaySubtitle)
+                    }
+                }
+
                 if onEdit != nil || onDelete != nil {
                     Divider()
                 }
@@ -331,6 +345,7 @@ struct CollectionContextMenuModifier: ViewModifier {
             } message: {
                 Text(PinError.limitReached.errorDescription ?? "")
             }
+            .ratingSheet(target: $ratingTarget)
     }
 }
 
@@ -350,6 +365,7 @@ struct LazyCollectionContextMenuModifier: ViewModifier {
 
     @Environment(\.appContainer) private var container
     @State private var showPinLimitAlert = false
+    @State private var ratingTarget: RatingTarget?
 
     private var isPinned: Bool {
         container?.pinService.isPinned(itemType: itemType, itemId: itemId) == true
@@ -470,6 +486,13 @@ struct LazyCollectionContextMenuModifier: ViewModifier {
                         )
                     }
                 }
+
+                // Subsonic rates songs, albums and artists — not playlists.
+                if itemType == .album {
+                    RateMenuButton(itemType: .album, itemId: itemId) {
+                        ratingTarget = RatingTarget(itemType: .album, itemId: itemId, title: displayName, subtitle: displaySubtitle)
+                    }
+                }
             } preview: {
                 CollectionContextPreview(
                     coverImage: coverImage,
@@ -482,6 +505,48 @@ struct LazyCollectionContextMenuModifier: ViewModifier {
             } message: {
                 Text(PinError.limitReached.errorDescription ?? "")
             }
+            .ratingSheet(target: $ratingTarget)
+    }
+}
+
+// MARK: - Artist context menu
+
+/// Favorite and Rate actions for an artist row or card.
+struct ArtistContextMenuModifier: ViewModifier {
+    let artistId: String
+    let artistName: String
+
+    @Environment(\.appContainer) private var container
+    @State private var ratingTarget: RatingTarget?
+
+    private var isFavorite: Bool {
+        container?.favoritesService.isFavorite(itemType: .artist, itemId: artistId) == true
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .contextMenu {
+                Button {
+                    let fav = isFavorite
+                    Task {
+                        if fav {
+                            try? await container?.favoritesService.unstar(itemType: .artist, itemId: artistId)
+                        } else {
+                            try? await container?.favoritesService.star(itemType: .artist, itemId: artistId)
+                        }
+                    }
+                } label: {
+                    Label(
+                        isFavorite ? "Remove from Favorites" : "Add to Favorites",
+                        systemImage: isFavorite ? "star.slash" : "star"
+                    )
+                }
+
+                RateMenuButton(itemType: .artist, itemId: artistId) {
+                    ratingTarget = RatingTarget(itemType: .artist, itemId: artistId, title: artistName)
+                }
+            }
+            .ratingSheet(target: $ratingTarget)
     }
 }
 
@@ -490,6 +555,10 @@ struct LazyCollectionContextMenuModifier: ViewModifier {
 extension View {
     func songContextMenu(song: DisplayableSong, coverImage: PlatformImage? = nil) -> some View {
         modifier(SongContextMenuModifier(song: song, coverImage: coverImage))
+    }
+
+    func artistContextMenu(artistId: String, artistName: String) -> some View {
+        modifier(ArtistContextMenuModifier(artistId: artistId, artistName: artistName))
     }
 
     /// - Parameters:

@@ -253,6 +253,7 @@ struct ArtistDetailView: View {
                 .font(.system(.title, design: .rounded, weight: .semibold))
                 .foregroundStyle(headerTextColor)
                 .multilineTextAlignment(.center)
+            ItemRatingBadge(itemType: .artist, itemId: artist.id, font: .cassetteCaption)
             Text("\(count) albums")
                 .font(.cassetteCaption)
                 .foregroundStyle(headerSecondaryColor)

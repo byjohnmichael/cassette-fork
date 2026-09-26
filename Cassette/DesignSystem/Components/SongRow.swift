@@ -30,6 +30,7 @@ struct SongRow: View {
     @Environment(ArtworkImageCache.self) private var artworkImageCache
     @Environment(\.cassettePlayingAccent) private var playingAccent
     @State private var coverImage: PlatformImage?
+    @State private var ratingTarget: RatingTarget?
     #if os(macOS)
     @State private var isHovered = false
     #endif
@@ -127,6 +128,7 @@ struct SongRow: View {
             Spacer(minLength: 0)
 
             HStack(spacing: CassetteSpacing.s) {
+                ItemRatingBadge(itemType: .song, itemId: song.id)
                 if song.isDownloaded {
                     Image(systemName: "arrow.down.circle.fill")
                         .font(.cassetteCaption)
@@ -240,11 +242,16 @@ struct SongRow: View {
             }
             .disabled(!isOnline)
 
+            RateMenuButton(itemType: .song, itemId: song.id) {
+                ratingTarget = RatingTarget(itemType: .song, itemId: song.id, title: song.title, subtitle: song.artist ?? "")
+            }
+
             // TODO(v1.5.x): Add "Show in Album" and "Show in Artist". Requires:
             // (1) albumId + artistId fields on DisplayableSong, (2) NavigationPath
             // lifted into RootViewMacOS and threaded through all section views.
         } preview: {
             SongContextPreview(coverImage: coverImage, song: song)
         }
+        .ratingSheet(target: $ratingTarget)
     }
 }
