@@ -315,7 +315,9 @@ actor PlayerService: PlayerServiceProtocol {
         }
         // Schedule cache download for stream sources only. Same +30s threshold as scrobble.
         // Phase 3: reads cacheSettings for format and cellular policy.
-        if case .stream(let streamURL, let customHeaders) = source {
+        // Skipped entirely while the user has caching turned off (the default).
+        if case .stream(let streamURL, let customHeaders) = source,
+           await MainActor.run(body: { cacheSettings.isEnabled }) {
             // Capture settings at task-creation time — in-flight tasks use values from when they were scheduled.
             let (allowCellular, cacheFormat) = await MainActor.run {
                 (cacheSettings.cacheOverCellular, cacheSettings.cacheFormat)

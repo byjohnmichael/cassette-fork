@@ -185,6 +185,19 @@ struct CacheSectionView: View {
             }
 
             if let cacheSettings {
+                Toggle(isOn: Binding(
+                    get: { cacheSettings.isEnabled },
+                    set: { cacheSettings.isEnabled = $0 }
+                )) {
+                    Label {
+                        Text("Cache recent tracks")
+                    } icon: {
+                        SettingsIcon(systemImage: "bolt.fill", color: .orange)
+                    }
+                }
+            }
+
+            if let cacheSettings, cacheSettings.isEnabled {
                 Stepper(
                     value: Binding(
                         get: { cacheSettings.maxTracks },
@@ -207,7 +220,7 @@ struct CacheSectionView: View {
                 }
             }
 
-            if let cacheSettings {
+            if let cacheSettings, cacheSettings.isEnabled {
                 Picker(selection: Binding<CacheFormat>(
                     get: { cacheSettings.cacheFormat },
                     set: { newValue in cacheSettings.cacheFormat = newValue }
@@ -225,7 +238,7 @@ struct CacheSectionView: View {
                 .pickerStyle(.menu)
             }
 
-            if let cacheSettings {
+            if let cacheSettings, cacheSettings.isEnabled {
                 Toggle(isOn: Binding(
                     get: { cacheSettings.cacheOverCellular },
                     set: { cacheSettings.cacheOverCellular = $0 }
@@ -269,7 +282,7 @@ struct CacheSectionView: View {
         } header: {
             Text("Cache")
         } footer: {
-            Text("Cached tracks let recently-played music load instantly without re-fetching from the server. Cache is automatic, sliding window — the oldest track is replaced when the limit is reached.")
+            Text("Off by default. When on, recently played tracks load instantly without re-fetching from the server. It is a sliding window — the oldest track is replaced when the limit is reached.")
         }
         .task {
             await refreshUsage()
