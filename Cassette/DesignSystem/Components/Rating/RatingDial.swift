@@ -7,8 +7,8 @@ import SwiftUI
 
 /// A circular slider for a 0.0–10.0 rating.
 ///
-/// The ring fills clockwise from 12 o'clock as the rating rises, shifting color along
-/// `RatingPalette`. Drag anywhere on the dial to set the value; the knob follows the finger.
+/// The ring fills clockwise from 12 o'clock as the rating rises. The whole arc takes the
+/// current rating's `RatingPalette` color, so it shifts from red to green as it fills. Drag anywhere on the dial to set the value; the knob follows the finger.
 /// A drag cannot wrap past 10 back to 0 (or the reverse) — it pins at the end instead.
 struct RatingDial: View {
     @Binding var value: Double
@@ -38,15 +38,7 @@ struct RatingDial: View {
                 if fraction > 0 {
                     Circle()
                         .trim(from: 0, to: fraction)
-                        .stroke(
-                            AngularGradient(
-                                colors: RatingPalette.gradientColors(upTo: value),
-                                center: .center,
-                                startAngle: .degrees(0),
-                                endAngle: .degrees(360 * fraction)
-                            ),
-                            style: StrokeStyle(lineWidth: ring, lineCap: .round)
-                        )
+                        .stroke(tint, style: StrokeStyle(lineWidth: ring, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
 

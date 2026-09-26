@@ -40,11 +40,6 @@ enum RatingPalette {
         )
     }
 
-    /// Evenly spaced colors from 0 up to `value`, for the dial's angular gradient.
-    static func gradientColors(upTo value: Double, samples: Int = 6) -> [Color] {
-        (0...samples).map { color(for: value * Double($0) / Double(samples)) }
-    }
-
     private static func color(of stop: Stop) -> Color {
         Color(red: stop.red, green: stop.green, blue: stop.blue)
     }
