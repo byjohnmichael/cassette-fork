@@ -10,6 +10,24 @@
 | `cassetteCoverShadow` | rgba(0,0,0,0.15) | transparent | — | Shadow on cover art in light mode |
 | `cassetteCoverBorder` | — | white 8% | — | Thin border on cover art in dark mode (replaces invisible shadow) |
 
+### Rating scale
+
+`RatingPalette.color(for:)` (`Components/Rating/RatingPalette.swift`) maps a 0.0–10.0 rating onto a
+fixed gradient. It is data coloring, not a theme color, so it does not change between light and dark
+mode and does not live in `Assets.xcassets`.
+
+| Rating | Color |
+|--------|-------|
+| 0 | `#E5484D` red |
+| 3 | `#F76B15` orange |
+| 5.5 | `#FFB224` amber |
+| 7.5 | `#F5D90A` yellow |
+| 9 | `#46A758` green |
+| 10 | `#12A594` teal |
+
+Values in between are interpolated. Permitted uses: the rating dial's fill and knob, rating badges,
+and the verdict label in the rating sheet. Never for anything that is not a rating.
+
 ## Rules
 
 1. **`cassetteAccent` is strictly for primary interactive elements.** It must never appear on body copy, captions, metadata labels, section headers, or timestamps.
