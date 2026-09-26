@@ -90,8 +90,8 @@ nonisolated struct MoodPreferences: Sendable {
 
     // MARK: - Attempt throttle
 
-    /// Timestamp of the last sync attempt, successful or not. Guards against a permanently
-    /// unreachable AudioMuse instance costing five slow HTTP calls on every single launch.
+    /// Timestamp of the last sync attempt, successful or not. Guards against an unreachable
+    /// server costing five slow HTTP calls on every single launch.
     func lastAttempt(serverId: String) -> Date? {
         let raw = userDefaults.double(forKey: Self.lastAttemptKey(serverId))
         return raw == 0 ? nil : Date(timeIntervalSinceReferenceDate: raw)
@@ -129,9 +129,6 @@ nonisolated struct MoodPreferences: Sendable {
 
     /// Marks every mood as due again without touching the playlist ids, so a rebuild rewrites the
     /// playlists the user already has rather than leaving five orphans behind.
-    ///
-    /// Used when the track source changes — connecting AudioMuse should not mean waiting until
-    /// Wednesday to hear the difference.
     func markAllDue(serverId: String) {
         for mood in Mood.allCases {
             userDefaults.removeObject(forKey: Self.cycleKey(mood, serverId))
@@ -141,8 +138,8 @@ nonisolated struct MoodPreferences: Sendable {
 
     // MARK: - Teardown
 
-    /// Forgets everything for a server — used when the user disconnects AudioMuse, so reconnecting
-    /// rebuilds rather than trusting stale playlist ids.
+    /// Forgets everything for a server, so the next sync rebuilds rather than trusting stale
+    /// playlist ids.
     func reset(serverId: String) {
         for mood in Mood.allCases {
             userDefaults.removeObject(forKey: Self.cycleKey(mood, serverId))

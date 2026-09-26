@@ -40,7 +40,6 @@ struct SettingsView: View {
             ReplayGainSettingsSection()
             CrossfadeSettingsSection()
             serverSection()
-            integrationsSection()
             aboutSection()
             KofiSupportSection()
             SupportersSection()
@@ -71,20 +70,6 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             // TODO(v1.x): multi-server management (add / remove / switch servers)
-        }
-    }
-
-    private func integrationsSection() -> some View {
-        Section("Integrations") {
-            NavigationLink {
-                AudioMuseSettingsView()
-            } label: {
-                Label {
-                    Text("AudioMuse")
-                } icon: {
-                    SettingsIcon(systemImage: "waveform.badge.magnifyingglass", color: .teal)
-                }
-            }
         }
     }
 

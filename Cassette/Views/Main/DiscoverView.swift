@@ -14,8 +14,8 @@ struct DiscoverView: View {
     @Namespace private var mostPlayedNS
     @State private var yearlyPlaylists: [WrappedYearlyPlaylist] = []
     @State private var radioStations: [InternetRadioStation] = []
-    /// Moods that have a server playlist to open. Empty when AudioMuse is unconfigured or has
-    /// never completed a sync — the section then disappears entirely rather than showing dead tiles.
+    /// Moods that have a server playlist to open. Empty when the mood sync has
+    /// never completed — the section then disappears entirely rather than showing dead tiles.
     @State private var availableMoods: [(mood: Mood, playlistId: String)] = []
 
     var body: some View {

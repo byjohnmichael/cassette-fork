@@ -5,13 +5,11 @@
 
 import Foundation
 import SwiftSonic
-import SwiftMuse
 import OSLog
 
 // MARK: - MoodTrackProvider
 
-/// Where a mood's tracks come from. Two implementations, in descending order of quality:
-/// AudioMuse's sonic analysis, and the server's own tags.
+/// Where a mood's tracks come from. The one implementation reads the server's own tags.
 nonisolated protocol MoodTrackProvider: Sendable {
     /// How the source describes itself in the UI.
     var kind: MoodSourceKind { get }
@@ -23,87 +21,13 @@ nonisolated protocol MoodTrackProvider: Sendable {
 }
 
 nonisolated enum MoodSourceKind: String, Sendable, Equatable {
-    /// AudioMuse-AI: matches on how the audio actually sounds.
-    case sonic
     /// The server's MOOD, genre and BPM tags: matches on what somebody wrote in the files.
     case tags
 }
 
-// MARK: - AudioMuse
-
-/// A failure specific to how Cassette turns AudioMuse results into playlist ids, distinct from the
-/// transport and HTTP failures ``SwiftMuseError`` reports from the client itself.
-nonisolated enum MoodProviderError: Error, Equatable, Sendable {
-    /// AudioMuse answered only with internal canonical (`fp_`) ids AND none of them could be
-    /// recovered by name from the library. Distinct from an empty result: there were tracks, just
-    /// none the music server can play.
-    case internalIdsOnly
-}
-
-/// Maps a ``SonicTrack`` to the metadata used to find it in the library when AudioMuse handed back
-/// an id the music server cannot match. Kept in the app rather than on the package's model, so the
-/// client stays free of Cassette types.
-extension SonicTrack {
-    nonisolated var descriptor: TrackDescriptor? {
-        guard let title, !title.isEmpty else { return nil }
-        return TrackDescriptor(title: title, artist: author, album: album)
-    }
-}
-
-/// Sonic search. The good one.
-///
-/// AudioMuse can answer with ids the music server does not recognise — its internal canonical ones,
-/// when its own track mapping is incomplete. Those are recovered rather than discarded: the results
-/// carry title and artist, so the track is looked up in the library instead. What AudioMuse is good
-/// at, choosing the tracks, is kept; what it got wrong, naming them, is redone here.
-nonisolated struct AudioMuseTrackProvider: MoodTrackProvider {
-    let client: SwiftMuseClient
-    /// Resolves tracks by metadata. Absent in tests that only exercise the id path.
-    let resolver: SubsonicTrackResolver?
-
-    init(client: SwiftMuseClient, resolver: SubsonicTrackResolver? = nil) {
-        self.client = client
-        self.resolver = resolver
-    }
-
-    var kind: MoodSourceKind { .sonic }
-
-    /// Loads the CLAP model up front — it is evicted after ten minutes idle, so a weekly job always
-    /// arrives cold and would otherwise pay the load inside the first mood's timeout.
-    func prepare() async { await client.warmup() }
-
-    func trackIds(for mood: Mood, limit: Int) async throws -> [String] {
-        let results = try await client.search(query: mood.query, limit: limit)
-        guard !results.isEmpty else { return [] }
-
-        // Usable ids keep their position; the rest are looked up by name. Order is preserved
-        // because it is AudioMuse's similarity ranking — the best matches come first.
-        var ids: [String] = []
-        var unresolvable = 0
-        var recovered = 0
-        for track in results {
-            if !track.hasInternalID {
-                ids.append(track.itemID)
-            } else if let resolver, let descriptor = track.descriptor, let id = await resolver.resolve(descriptor) {
-                ids.append(id)
-                recovered += 1
-            } else {
-                unresolvable += 1
-            }
-        }
-
-        Logger.moodPlaylists.info("[MOOD-SONIC] \(mood.rawValue, privacy: .public): \(results.count, privacy: .public) results → \(ids.count, privacy: .public) usable (\(recovered, privacy: .public) recovered by name, \(unresolvable, privacy: .public) lost)")
-
-        // Everything came back with an unusable id and nothing could be found in the library: the
-        // caller must not treat that as a successful, empty playlist.
-        if ids.isEmpty && !results.isEmpty { throw MoodProviderError.internalIdsOnly }
-        return ids
-    }
-}
-
 // MARK: - Tags
 
-/// Fallback for servers with no AudioMuse instance: rank the library's own tags.
+/// Ranks the library's own tags.
 ///
 /// Genuinely weaker than sonic analysis and does not pretend otherwise — see MoodTagMatcher. What
 /// it does have is universality: `getSongsByGenre`, `moods` and `bpm` are plain OpenSubsonic, so

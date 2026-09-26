@@ -41,8 +41,7 @@ final class AppContainer {
     let statsService: StatsService
     private let _player: PlayerService
     let wrappedPlaylistService: WrappedPlaylistService
-    /// Weekly mood playlists. Always available: AudioMuse powers them when configured, the
-    /// server's own tags when not.
+    /// Weekly mood playlists, built from the server's own tags.
     let moodPlaylistService: MoodPlaylistService
     let lyricsService: LyricsService
     let widgetSyncService: WidgetSyncService
@@ -92,7 +91,6 @@ final class AppContainer {
         }
         moodPlaylistService = MoodPlaylistService(
             serverService: server,
-            serverState: serverState,
             libraryService: library,
             coverApplier: moodCovers
         )

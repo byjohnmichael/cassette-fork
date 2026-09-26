@@ -21,10 +21,8 @@ nonisolated struct SongTagFeatures: Sendable, Equatable {
 
 /// Scores a track against a mood using only the tags the server already has.
 ///
-/// This is the fallback for libraries with no AudioMuse instance. It is genuinely weaker: a MOOD
-/// tag is somebody's opinion written into a file, a genre is a category, and BPM says nothing about
-/// whether a fast track is joyful or bleak. AudioMuse listens to the audio; this reads labels. The
-/// point is to be useful when the good option is absent, not to pretend to match it.
+/// A MOOD tag is somebody's opinion written into a file, a genre is a category, and BPM says
+/// nothing about whether a fast track is joyful or bleak — this reads labels, not the audio.
 ///
 /// Signals are weighted by how much they actually say:
 /// - a MOOD tag hit is worth most — it is the only tag that describes feel rather than category

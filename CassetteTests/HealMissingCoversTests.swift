@@ -35,7 +35,6 @@ private final class HealServerStub: ServerServiceProtocol {
     func testConnection() async throws {}
     func testConnection(url: String, username: String, password: String, customHeaders: [String: String]) async throws {}
     func addServer(displayName: String, baseURL: String, username: String, password: String, customHeaders: [String: String]) async throws {}
-    func setAudioMuseConfig(serverId: UUID, urlString: String?, token: String?) async throws {}
     func loadPersistedState() async {}
     func removeServer(id: UUID) async throws {}
     func setActiveServer(id: UUID) async throws {}
