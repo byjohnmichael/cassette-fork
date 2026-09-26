@@ -23,7 +23,6 @@ struct ArtistDetailMacOS: View {
     @Environment(\.appContainer) private var container
     @Environment(\.dismiss) private var dismiss
     @State private var vm: ArtistDetailViewModel?
-    @State private var selectedOutOfLibraryArtist: SimilarArtistRecommendation?
     @State private var isGeneratingMix = false
     /// Shared album ordering, persisted and reused by the global album list too.
     @AppStorage("cassette.albumSort") private var albumSort: AlbumSort = .recentlyAdded
@@ -52,20 +51,12 @@ struct ArtistDetailMacOS: View {
                     libraryService: c.libraryService,
                     downloadService: c.downloadService,
                     recommendationService: c.recommendationService,
-                    imageResolver: c.externalArtistImageResolver,
                     serverState: c.serverState
                 )
             }
             await vm?.load()
             await vm?.loadSimilarArtists()
             await vm?.loadArtistInfo()
-        }
-        .sheet(item: $selectedOutOfLibraryArtist) { rec in
-            OutOfLibraryArtistSheet(
-                artist: rec,
-                imageURL: vm?.outOfLibraryArtistImages[rec.id] ?? nil,
-                providers: container?.externalProvidersStore.load() ?? []
-            )
         }
     }
 
@@ -187,24 +178,10 @@ struct ArtistDetailMacOS: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: CassetteSpacing.m) {
                         ForEach(vm.similarArtists) { rec in
-                            Group {
-                                if rec.inLibrary {
-                                    NavigationLink(value: HomeDestination.artist(ArtistID3(id: rec.id, name: rec.name))) {
-                                        SimilarArtistCell(
-                                            recommendation: rec,
-                                            externalImageURL: vm.outOfLibraryArtistImages[rec.id] ?? nil,
-                                            onOutOfLibraryTap: { selectedOutOfLibraryArtist = rec }
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
-                                } else {
-                                    SimilarArtistCell(
-                                        recommendation: rec,
-                                        externalImageURL: vm.outOfLibraryArtistImages[rec.id] ?? nil,
-                                        onOutOfLibraryTap: { selectedOutOfLibraryArtist = rec }
-                                    )
-                                }
+                            NavigationLink(value: HomeDestination.artist(ArtistID3(id: rec.id, name: rec.name))) {
+                                SimilarArtistCell(recommendation: rec)
                             }
+                            .buttonStyle(.plain)
                             .frame(width: 80)
                         }
                     }

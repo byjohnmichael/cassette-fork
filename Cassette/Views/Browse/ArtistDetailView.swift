@@ -13,7 +13,6 @@ struct ArtistDetailView: View {
     @Environment(\.appContainer) private var container
     @Environment(ArtworkImageCache.self) private var artworkImageCache
     @State private var viewModel: ArtistDetailViewModel?
-    @State private var selectedOutOfLibraryArtist: SimilarArtistRecommendation?
     @Query private var artistFavoriteMatches: [FavoriteRecord]
     /// Every starred song (ids only). Filtering the fetched liked list through this makes the section
     /// react instantly when a track is unstarred from its context menu, with no refetch.
@@ -184,7 +183,6 @@ struct ArtistDetailView: View {
                     libraryService: c.libraryService,
                     downloadService: c.downloadService,
                     recommendationService: c.recommendationService,
-                    imageResolver: c.externalArtistImageResolver,
                     serverState: c.serverState
                 )
             }
@@ -193,13 +191,6 @@ struct ArtistDetailView: View {
             await viewModel?.loadLikedSongs()
             await viewModel?.loadSimilarArtists()
             await viewModel?.loadArtistInfo()
-        }
-        .sheet(item: $selectedOutOfLibraryArtist) { rec in
-            OutOfLibraryArtistSheet(
-                artist: rec,
-                imageURL: viewModel?.outOfLibraryArtistImages[rec.id] ?? nil,
-                providers: container?.externalProvidersStore.load() ?? []
-            )
         }
     }
 
@@ -719,24 +710,10 @@ struct ArtistDetailView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: CassetteSpacing.m) {
                         ForEach(vm.similarArtists) { rec in
-                            Group {
-                                if rec.inLibrary {
-                                    NavigationLink(value: HomeDestination.artist(ArtistID3(id: rec.id, name: rec.name))) {
-                                        SimilarArtistCell(
-                                            recommendation: rec,
-                                            externalImageURL: vm.outOfLibraryArtistImages[rec.id] ?? nil,
-                                            onOutOfLibraryTap: { selectedOutOfLibraryArtist = rec }
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
-                                } else {
-                                    SimilarArtistCell(
-                                        recommendation: rec,
-                                        externalImageURL: vm.outOfLibraryArtistImages[rec.id] ?? nil,
-                                        onOutOfLibraryTap: { selectedOutOfLibraryArtist = rec }
-                                    )
-                                }
+                            NavigationLink(value: HomeDestination.artist(ArtistID3(id: rec.id, name: rec.name))) {
+                                SimilarArtistCell(recommendation: rec)
                             }
+                            .buttonStyle(.plain)
                             .frame(width: 80)
                         }
                     }
@@ -820,101 +797,3 @@ struct ArtistBioSkeleton: View {
     }
 }
 
-// MARK: - Out-of-library artist sheet
-
-struct OutOfLibraryArtistSheet: View {
-    let artist: SimilarArtistRecommendation
-    let imageURL: URL?
-    let providers: [ExternalReleaseProvider]
-
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: CassetteSpacing.l) {
-                    ExternalCoverView(url: imageURL) {
-                        ArtistPlaceholderView(name: artist.name, size: 120)
-                    }
-                    .frame(width: 120, height: 120)
-                    .clipShape(Circle())
-                    .padding(.top, CassetteSpacing.l)
-
-                    VStack(spacing: CassetteSpacing.xs) {
-                        Text(artist.name)
-                            .font(.title2.bold())
-                            .multilineTextAlignment(.center)
-
-                        Text("Not in your library")
-                            .font(.cassetteCaption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    externalLinksSection
-                }
-                .padding(CassetteSpacing.l)
-            }
-            .navigationTitle(artist.name)
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var externalLinksSection: some View {
-        VStack(spacing: CassetteSpacing.s) {
-            if !providers.isEmpty {
-                ForEach(providers) { provider in
-                    if let url = provider.buildURL(artistName: artist.name, albumTitle: "") {
-                        externalLinkButton(title: "View on \(provider.name)", url: url, secondary: false)
-                    }
-                }
-            }
-
-            if let mbid = artist.mbid {
-                if let lbURL = URL(string: "https://listenbrainz.org/artist/\(mbid)/") {
-                    externalLinkButton(
-                        title: "View on ListenBrainz",
-                        url: lbURL,
-                        secondary: !providers.isEmpty
-                    )
-                }
-                if let mbURL = URL(string: "https://musicbrainz.org/artist/\(mbid)") {
-                    externalLinkButton(
-                        title: "View on MusicBrainz",
-                        url: mbURL,
-                        secondary: !providers.isEmpty
-                    )
-                }
-            }
-        }
-        .padding(.horizontal, CassetteSpacing.l)
-    }
-
-    private func externalLinkButton(title: LocalizedStringKey, url: URL, secondary: Bool) -> some View {
-        Button {
-            ExternalLinkOpener.open(url)
-        } label: {
-            HStack {
-                Text(title)
-                Spacer(minLength: 0)
-                Image(systemName: "arrow.up.right")
-            }
-            .font(.cassetteCellTitle)
-            .padding(CassetteSpacing.m)
-            .frame(maxWidth: .infinity)
-            .background(secondary
-                ? Color.secondary.opacity(0.08)
-                : Color.cassetteAccent.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: CassetteCornerRadius.standard, style: .continuous))
-            .foregroundStyle(secondary ? Color.secondary : Color.cassetteAccent)
-        }
-        .buttonStyle(.plain)
-    }
-}

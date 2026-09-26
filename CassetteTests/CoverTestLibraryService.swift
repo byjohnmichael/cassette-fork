@@ -43,7 +43,6 @@ final class CoverTestLibraryService: LibraryServiceProtocol {
     func savePlayQueue(songIds: [String], currentIndex: Int, positionSeconds: Double) async throws { throw Unused() }
     func getPlayQueue() async throws -> SavedPlayQueue? { throw Unused() }
     func getArtistInfo(forArtistID artistID: String, count: Int) async throws -> ArtistInfo { throw Unused() }
-    func getArtistMBID(forArtistID artistID: String) async throws -> String? { throw Unused() }
     func topSongs(artist: String, count: Int) async throws -> [DisplayableSong] { throw Unused() }
     func instantMix(from seed: InstantMixSeed, count: Int) async throws -> [DisplayableSong] { throw Unused() }
 }

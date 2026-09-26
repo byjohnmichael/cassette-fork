@@ -67,7 +67,6 @@ final class TagLibraryStub: LibraryServiceProtocol, @unchecked Sendable {
     func savePlayQueue(songIds: [String], currentIndex: Int, positionSeconds: Double) async throws {}
     func getPlayQueue() async throws -> SavedPlayQueue? { nil }
     func getArtistInfo(forArtistID artistID: String, count: Int) async throws -> ArtistInfo { throw URLError(.unknown) }
-    func getArtistMBID(forArtistID artistID: String) async throws -> String? { nil }
     func findArtist(byName name: String) async -> ArtistID3? { nil }
     func topSongs(artist: String, count: Int) async throws -> [DisplayableSong] { [] }
     func instantMix(from seed: InstantMixSeed, count: Int) async throws -> [DisplayableSong] { [] }

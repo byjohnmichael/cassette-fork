@@ -36,7 +36,6 @@ actor PlayerService: PlayerServiceProtocol {
     private var replayGainService: ReplayGainService?
     private let toastService: ToastService
     private let statsService: StatsService
-    private let listenBrainzService: ListenBrainzService
 
     // AudioStreaming — single instance for the session lifetime.
     // nonisolated(unsafe): constant references; AudioPlayer has its own internal queue.
@@ -96,8 +95,6 @@ actor PlayerService: PlayerServiceProtocol {
     }
     nonisolated var restoredVolume: Float { Self.persistedVolume() }
     private var positionSaveTask: Task<Void, Never>?
-    /// Task reserved for the playing-now notification. Cancelled on track change.
-    private var playingNowTask: Task<Void, Never>?
     private var detector = ScrobbleThresholdDetector()
     /// Task scheduled to download and cache the current track at +30s of playback.
     /// Cancelled when track changes via cancelPendingCacheDownload().
@@ -148,8 +145,7 @@ actor PlayerService: PlayerServiceProtocol {
         replayGainSettings: ReplayGainSettings,
         crossfadeSettings: CrossfadeSettings,
         toastService: ToastService,
-        statsService: StatsService,
-        listenBrainzService: ListenBrainzService
+        statsService: StatsService
     ) {
         self.state = state
         self.mediaResolver = mediaResolver
@@ -164,7 +160,6 @@ actor PlayerService: PlayerServiceProtocol {
         self.crossfadeSettings = crossfadeSettings
         self.toastService = toastService
         self.statsService = statsService
-        self.listenBrainzService = listenBrainzService
         let cacheConfig = URLSessionConfiguration.default
         cacheConfig.timeoutIntervalForRequest = 30
         cacheConfig.timeoutIntervalForResource = 30
@@ -288,8 +283,7 @@ actor PlayerService: PlayerServiceProtocol {
         wasTrackCompletedNaturally = false
         resetTrackAccumulator(isPlaying: true)
 
-        // Cancel any pending +30s scrobble, cache download, and prefetch from the previous track.
-        cancelPendingScrobble()
+        // Cancel any pending cache download and prefetch from the previous track.
         cancelPendingCacheDownload()
         cancelPendingPrefetch()
         // Capture crossfade intent before cancelling fade tasks.
@@ -305,13 +299,6 @@ actor PlayerService: PlayerServiceProtocol {
         let songId = song.id
         Task { [libraryService] in
             await libraryService.scrobble(songId: songId, submission: false)
-        }
-        playingNowTask = Task { [listenBrainzService, weak self] in
-            try? await Task.sleep(for: .seconds(3))
-            guard !Task.isCancelled, let self else { return }
-            let stillActive = await MainActor.run { self.state.playbackState == .playing && self.state.currentTrack?.id == song.id }
-            guard stillActive else { return }
-            await listenBrainzService.notifyTrackStarted(song: song)
         }
         // Schedule cache download for stream sources only. Same +30s threshold as scrobble.
         // Phase 3: reads cacheSettings for format and cellular policy.
@@ -459,7 +446,6 @@ actor PlayerService: PlayerServiceProtocol {
     // MARK: - Live Stream
 
     func playRadio(_ station: InternetRadioStation) async throws {
-        cancelPendingScrobble()
         cancelPendingCacheDownload()
         cancelFadeTasks()
         let source = try await mediaResolver.resolveRadio(station)
@@ -1130,7 +1116,6 @@ actor PlayerService: PlayerServiceProtocol {
     // MARK: - Stop
 
     func stop() async {
-        cancelPendingScrobble()
         cancelPendingCacheDownload()
         cancelPendingPrefetch()
         cancelFadeTasks()
@@ -1618,13 +1603,6 @@ actor PlayerService: PlayerServiceProtocol {
 
     // MARK: - Scrobble
 
-    /// Cancels any pending playing-now task. Called when switching tracks,
-    /// switching to radio, or stopping. Safe to call when no task is scheduled.
-    private func cancelPendingScrobble() {
-        playingNowTask?.cancel()
-        playingNowTask = nil
-    }
-
     private func checkScrobbleThreshold() async {
         guard let song = await MainActor.run(body: { state.currentTrack }) else { return }
         fireScrobbleIfThresholdMet(song: song)
@@ -1638,12 +1616,8 @@ actor PlayerService: PlayerServiceProtocol {
         let segmentContrib = currentPlaySegmentStart.map { Date().timeIntervalSince($0) } ?? 0
         let accumulated = accumulatedPlayedSeconds + segmentContrib
         guard detector.check(duration: duration, accumulated: accumulated) else { return }
-        let startDate = trackPlayStartDate ?? Date()
         Task { [libraryService] in
             await libraryService.scrobble(songId: songId, submission: true)
-        }
-        Task { [listenBrainzService] in
-            await listenBrainzService.notifyScrobbleThreshold(song: song, startDate: startDate)
         }
     }
 

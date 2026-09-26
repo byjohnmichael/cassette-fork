@@ -77,30 +77,12 @@ struct SettingsView: View {
     private func integrationsSection() -> some View {
         Section("Integrations") {
             NavigationLink {
-                ListenBrainzSettingsView()
-            } label: {
-                Label {
-                    Text("ListenBrainz")
-                } icon: {
-                    SettingsIcon(systemImage: "link.circle", color: .indigo)
-                }
-            }
-            NavigationLink {
                 AudioMuseSettingsView()
             } label: {
                 Label {
                     Text("AudioMuse")
                 } icon: {
                     SettingsIcon(systemImage: "waveform.badge.magnifyingglass", color: .teal)
-                }
-            }
-            NavigationLink {
-                ExternalProvidersSettingsView()
-            } label: {
-                Label {
-                    Text("Open Releases In")
-                } icon: {
-                    SettingsIcon(systemImage: "arrow.up.right.square", color: .orange)
                 }
             }
         }

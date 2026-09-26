@@ -47,10 +47,6 @@ final class AppContainer {
     let lyricsService: LyricsService
     let widgetSyncService: WidgetSyncService
     let recommendationService: RecommendationService
-    let listenBrainzService: ListenBrainzService
-    let externalProvidersStore = ExternalProvidersStore()
-    let externalArtworkCache = ExternalArtworkCache()
-    let externalArtistImageResolver = ExternalArtistImageResolver()
     let searchHistoryService: SearchHistoryService
     let replayGainService = ReplayGainService()
     let replayGainSettings = ReplayGainSettings()
@@ -109,11 +105,7 @@ final class AppContainer {
         )
         mediaResolver = resolver
 
-        let lbClient = ListenBrainzClient(transport: URLSessionListenBrainzTransport())
-        let lb = ListenBrainzService(client: lbClient, keychain: keychain)
-        listenBrainzService = lb
-
-        let player = PlayerService(state: playerState, mediaResolver: resolver, serverService: server, sessionService: sessionService, artworkImageCache: artworkImageCache, libraryService: library, audioStreamCache: cache, downloadService: download, cacheSettings: cacheSettings, replayGainSettings: replayGainSettings, crossfadeSettings: crossfadeSettings, toastService: toastService, statsService: stats, listenBrainzService: lb)
+        let player = PlayerService(state: playerState, mediaResolver: resolver, serverService: server, sessionService: sessionService, artworkImageCache: artworkImageCache, libraryService: library, audioStreamCache: cache, downloadService: download, cacheSettings: cacheSettings, replayGainSettings: replayGainSettings, crossfadeSettings: crossfadeSettings, toastService: toastService, statsService: stats)
         _player = player
         playerService = player
 
@@ -146,14 +138,9 @@ final class AppContainer {
         }
         Task { [playlist] in await playlist.retryMissingPlaylistDownloads() }
 
-        let subsonicProvider = SubsonicRecommendationProvider(libraryService: library)
-        let lbProvider = ListenBrainzRecommendationProvider(client: lbClient, service: lb, libraryService: library)
-        recommendationService = RecommendationService(providers: [lbProvider, subsonicProvider])
+        recommendationService = RecommendationService(providers: [SubsonicRecommendationProvider(libraryService: library)])
 
         searchHistoryService = SearchHistoryService(container: modelContainer)
-
-        Task { await listenBrainzService.loadPersistedState() }
-        Task { await externalArtworkCache.runGarbageCollection() }
     }
 
     /// Awaited by CassetteApp's `.task` before the UI appears, ensuring

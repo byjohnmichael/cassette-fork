@@ -14,14 +14,6 @@ struct DiscoverView: View {
     @Namespace private var mostPlayedNS
     @State private var yearlyPlaylists: [WrappedYearlyPlaylist] = []
     @State private var radioStations: [InternetRadioStation] = []
-    #if os(iOS)
-    @Namespace private var freshReleaseZoomNamespace
-    #else
-    @State private var selectedRelease: AlbumRecommendation?
-    #endif
-    @State private var showAllFreshReleases = false
-    @State private var allReleasesVM: AllFreshReleasesViewModel?
-    @State private var isListenBrainzConnected: Bool = false
     /// Moods that have a server playlist to open. Empty when AudioMuse is unconfigured or has
     /// never completed a sync — the section then disappears entirely rather than showing dead tiles.
     @State private var availableMoods: [(mood: Mood, playlistId: String)] = []
@@ -33,7 +25,6 @@ struct DiscoverView: View {
                     if vm.isErrorState {
                         errorBanner(vm: vm)
                     } else {
-                        freshReleasesSection(vm: vm)
                         recentlyPlayedSection(vm: vm)
                         mostPlayedSection(vm: vm)
                     }
@@ -51,17 +42,9 @@ struct DiscoverView: View {
         .task(id: container?.serverState.activeServer?.selectedMusicFolderId) {
             guard let container else { return }
             if vm == nil {
-                vm = DiscoverViewModel(
-                    libraryService: container.libraryService,
-                    recommendationService: container.recommendationService
-                )
-            }
-            if allReleasesVM == nil {
-                allReleasesVM = AllFreshReleasesViewModel(recommendationService: container.recommendationService)
+                vm = DiscoverViewModel(libraryService: container.libraryService)
             }
             await vm?.load()
-            isListenBrainzConnected = await container.listenBrainzService.currentSnapshot().isEnabled
-            await vm?.loadFreshReleases()
             radioStations = (try? await container.radioService.listStations(forceRefresh: false)) ?? []
             guard let serverId = container.serverState.activeServer?.id.uuidString else { return }
             yearlyPlaylists = await container.wrappedPlaylistService.fetchYearlyPlaylists(serverId: serverId)
@@ -69,37 +52,7 @@ struct DiscoverView: View {
         }
         .refreshable {
             await vm?.load(forceRefresh: true)
-            isListenBrainzConnected = await container?.listenBrainzService.currentSnapshot().isEnabled ?? false
-            await vm?.loadFreshReleases()
             radioStations = (try? await container?.radioService.listStations(forceRefresh: true)) ?? []
-        }
-        #if os(iOS)
-        .navigationDestination(for: AlbumRecommendation.self) { release in
-            FreshReleaseDetailView(
-                release: release,
-                providers: container?.externalProvidersStore.load() ?? []
-            )
-            .cassetteZoomTransition(
-                sourceID: release.id ?? "\(release.artistName)-\(release.title)",
-                in: freshReleaseZoomNamespace
-            )
-        }
-        #else
-        .sheet(isPresented: Binding(
-            get: { selectedRelease != nil },
-            set: { if !$0 { selectedRelease = nil } }
-        )) {
-            if let release = selectedRelease {
-                NavigationStack {
-                    FreshReleaseDetailView(release: release, providers: container?.externalProvidersStore.load() ?? [])
-                }
-            }
-        }
-        #endif
-        .navigationDestination(isPresented: $showAllFreshReleases) {
-            if let vm = allReleasesVM {
-                AllFreshReleasesView(vm: vm)
-            }
         }
     }
 
@@ -145,27 +98,6 @@ struct DiscoverView: View {
     }
 
     // MARK: - Sections
-
-    @ViewBuilder
-    private func freshReleasesSection(vm: DiscoverViewModel) -> some View {
-        #if os(iOS)
-        FreshReleasesCard(
-            releases: vm.freshReleases,
-            isLoading: vm.isLoadingFreshReleases,
-            isListenBrainzConnected: isListenBrainzConnected,
-            onSeeAll: { showAllFreshReleases = true },
-            zoomNamespace: freshReleaseZoomNamespace
-        )
-        #else
-        FreshReleasesCard(
-            releases: vm.freshReleases,
-            isLoading: vm.isLoadingFreshReleases,
-            isListenBrainzConnected: isListenBrainzConnected,
-            onSeeAll: { showAllFreshReleases = true },
-            onTap: { release in selectedRelease = release }
-        )
-        #endif
-    }
 
     private func recentlyPlayedSection(vm: DiscoverViewModel) -> some View {
         #if os(macOS)

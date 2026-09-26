@@ -43,7 +43,6 @@ private final class PSLibraryStub: LibraryServiceProtocol {
     func savePlayQueue(songIds: [String], currentIndex: Int, positionSeconds: Double) async throws { throw URLError(.unknown) }
     func getPlayQueue() async throws -> SavedPlayQueue? { throw URLError(.unknown) }
     func getArtistInfo(forArtistID artistID: String, count: Int) async throws -> ArtistInfo { throw URLError(.unknown) }
-    func getArtistMBID(forArtistID artistID: String) async throws -> String? { nil }
     func topSongs(artist: String, count: Int) async throws -> [DisplayableSong] { [] }
     func instantMix(from seed: InstantMixSeed, count: Int) async throws -> [DisplayableSong] { [] }
 }
