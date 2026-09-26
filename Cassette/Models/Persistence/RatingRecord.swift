@@ -12,11 +12,8 @@ nonisolated enum RatedItemType: String, CaseIterable, Sendable {
     case artist
 }
 
-/// A user's 0.0–10.0 rating of a song, album or artist.
-///
-/// This is the source of truth for the precise value. Subsonic's `setRating` only stores whole
-/// stars (1–5), so the server receives a rounded copy (see `RatingScale.serverStars`) and the
-/// decimal lives here.
+/// A user's 0.0–10.0 rating of a song, album or artist. Kept on the device only: Subsonic's
+/// `setRating` can hold nothing finer than whole 1–5 stars, so the server is not involved.
 @Model
 final class RatingRecord {
     @Attribute(.unique) var id: String  // "{serverId}:{type}:{itemId}"

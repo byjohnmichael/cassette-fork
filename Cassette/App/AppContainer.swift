@@ -7,7 +7,6 @@ import Foundation
 import OSLog
 import SwiftUI
 import SwiftData
-import SwiftSonic
 
 /// DI root. Creates and wires all services in dependency order.
 /// Passed into the SwiftUI environment via \.appContainer.
@@ -122,13 +121,7 @@ final class AppContainer {
         nowPlayingService = nowPlaying
 
         favoritesService = FavoritesService(libraryService: library, serverState: serverState, modelContainer: modelContainer)
-        ratingService = RatingService(
-            modelContainer: modelContainer,
-            serverState: serverState,
-            pushToServer: { itemId, stars in
-                try await server.makeSwiftSonicClient().setRating(id: itemId, rating: stars)
-            }
-        )
+        ratingService = RatingService(modelContainer: modelContainer, serverState: serverState)
         let pin = PinService(modelContainer: modelContainer)
         pinService = pin
         let playlist = PlaylistService(serverService: server, modelContainer: modelContainer, downloadService: download)

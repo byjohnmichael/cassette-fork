@@ -8,36 +8,29 @@ import Observation
 import SwiftData
 import OSLog
 
-/// Stores the user's 0.0–10.0 ratings of songs, albums and artists.
+/// Stores the user's 0.0–10.0 ratings of songs, albums and artists, in SwiftData on the device.
 ///
-/// The precise value is kept locally in SwiftData; a rounded 1–5 star copy is pushed to the
-/// server with Subsonic's `setRating`, so other clients (Navidrome's web UI, etc.) see an
-/// approximation. Server writes are best-effort: a failure is logged and the local rating stays.
+/// Ratings are never sent to the server: Subsonic's `setRating` only holds whole 1–5 stars,
+/// and Cassette does not use a star rating. They are keyed per server so the same item id on
+/// two servers stays separate.
 ///
 /// Observable so rating badges in rows update as soon as a rating is saved. Every record is
 /// mirrored into `values` on init — the table holds one small row per rated item.
 @MainActor
 @Observable
 final class RatingService {
-    typealias ServerPush = @Sendable (_ itemId: String, _ stars: Int) async throws -> Void
-
     @ObservationIgnored private let modelContext: ModelContext
     @ObservationIgnored private let serverState: ServerState
-    @ObservationIgnored private let pushToServer: ServerPush
 
     /// Composite id → value, across all servers.
     private var values: [String: Double] = [:]
 
-    /// The latest server write. Exposed so tests can await it rather than sleep.
-    @ObservationIgnored private(set) var syncTask: Task<Void, Never>?
-
-    init(modelContainer: ModelContainer, serverState: ServerState, pushToServer: @escaping ServerPush) {
+    init(modelContainer: ModelContainer, serverState: ServerState) {
         // Own context, like PinService: saves here must not flush the main context's @Query users.
         let ctx = ModelContext(modelContainer)
         ctx.autosaveEnabled = false
         self.modelContext = ctx
         self.serverState = serverState
-        self.pushToServer = pushToServer
 
         let records = (try? ctx.fetch(FetchDescriptor<RatingRecord>())) ?? []
         values = Dictionary(records.map { ($0.id, $0.value) }, uniquingKeysWith: { _, last in last })
@@ -68,7 +61,6 @@ final class RatingService {
         values[compositeId] = normalized
 
         Logger.ratings.info("Rated \(itemType.rawValue, privacy: .public) \(itemId, privacy: .public) \(normalized, privacy: .public)")
-        push(stars: RatingScale.serverStars(for: normalized), itemId: itemId)
     }
 
     func clearRating(for itemType: RatedItemType, itemId: String) {
@@ -82,7 +74,6 @@ final class RatingService {
         values[compositeId] = nil
 
         Logger.ratings.info("Cleared rating for \(itemType.rawValue, privacy: .public) \(itemId, privacy: .public)")
-        push(stars: 0, itemId: itemId)
     }
 
     // MARK: - Private
@@ -93,19 +84,5 @@ final class RatingService {
         )
         descriptor.fetchLimit = 1
         return try? modelContext.fetch(descriptor).first
-    }
-
-    private func push(stars: Int, itemId: String) {
-        let push = pushToServer
-        let previous = syncTask
-        // Chained so two quick edits of the same item reach the server in order.
-        syncTask = Task {
-            await previous?.value
-            do {
-                try await push(itemId, stars)
-            } catch {
-                Logger.ratings.warning("Server rating sync failed for \(itemId, privacy: .public): \(error, privacy: .public)")
-            }
-        }
     }
 }

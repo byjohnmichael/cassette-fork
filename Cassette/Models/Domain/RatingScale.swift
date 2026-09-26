@@ -5,7 +5,7 @@
 
 import Foundation
 
-/// The 0.0–10.0 rating scale and its mapping onto Subsonic's 1–5 star ratings.
+/// The 0.0–10.0 rating scale.
 nonisolated enum RatingScale {
     static let range: ClosedRange<Double> = 0...10
     static let step: Double = 0.1
@@ -19,20 +19,6 @@ nonisolated enum RatingScale {
         // Divide an integer count of tenths rather than multiply by `step`: n / 10 is the double
         // closest to the decimal, so 8.4 compares equal to the literal 8.4.
         return (clamped * 10).rounded() / 10
-    }
-
-    /// The whole-star value mirrored to the server. Subsonic reserves `0` for "no rating", so
-    /// every real rating — 0.0 included — maps to at least one star.
-    static func serverStars(for value: Double) -> Int {
-        let stars = Int((normalized(value) / 2).rounded(.toNearestOrAwayFromZero))
-        return min(max(stars, 1), 5)
-    }
-
-    /// Converts a server star rating (1–5) into the 0–10 scale. `nil` for 0 / missing, which
-    /// Subsonic uses to mean "not rated".
-    static func value(fromServerStars stars: Int?) -> Double? {
-        guard let stars, (1...5).contains(stars) else { return nil }
-        return Double(stars * 2)
     }
 
     /// "8.4" — always one decimal, locale-aware separator.
