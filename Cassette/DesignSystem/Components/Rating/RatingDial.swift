@@ -7,8 +7,9 @@ import SwiftUI
 
 /// A circular slider for a 0.0–10.0 rating.
 ///
-/// The ring fills clockwise from 12 o'clock as the rating rises. The whole arc takes the
-/// current rating's `RatingPalette` color, so it shifts from red to green as it fills. Drag anywhere on the dial to set the value; the knob follows the finger.
+/// The ring fills clockwise from 12 o'clock as the rating rises. The arc takes the current
+/// rating's `RatingPalette` color — shaded from deep at the start to light at the knob — so it
+/// shifts from red to green as it fills. Drag anywhere on the dial to set the value; the knob follows the finger.
 /// A drag cannot wrap past 10 back to 0 (or the reverse) — it pins at the end instead.
 struct RatingDial: View {
     @Binding var value: Double
@@ -21,26 +22,26 @@ struct RatingDial: View {
     @State private var isDragging = false
 
     private var fraction: Double { RatingScale.normalized(value) / RatingScale.range.upperBound }
-    private var tint: Color { RatingPalette.color(for: value) }
 
     var body: some View {
         GeometryReader { geo in
             let diameter = min(geo.size.width, geo.size.height)
             let ring = diameter * ringRatio
+            // The ring's center line. `stroke` straddles a shape's edge, so the circles below are
+            // inset by half the ring: the band then sits inside the frame, on the same line as the
+            // knob and the tick dots.
             let radius = (diameter - ring) / 2
+            let track = Circle().inset(by: ring / 2)
 
             ZStack {
-                Circle()
+                track
                     .stroke(Color.secondary.opacity(0.18), lineWidth: ring)
 
-                ticks(radius: radius, ring: ring)
-
                 if fraction > 0 {
-                    Circle()
-                        .trim(from: 0, to: fraction)
-                        .stroke(tint, style: StrokeStyle(lineWidth: ring, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
+                    arc(track: track, radius: radius, ring: ring)
                 }
+
+                ticks(radius: radius, ring: ring)
 
                 knob(ring: ring)
                     .offset(knobOffset(radius: radius))
@@ -75,6 +76,33 @@ struct RatingDial: View {
 
     // MARK: - Pieces
 
+    /// The filled part of the ring: the rating's color, deep at 12 o'clock and lightening towards
+    /// the knob, like the Apple Card payment ring.
+    private func arc(track: some InsettableShape, radius: CGFloat, ring: CGFloat) -> some View {
+        let shades = RatingPalette.arcShades(for: value)
+        return ZStack {
+            track
+                .trim(from: 0, to: fraction)
+                .stroke(
+                    AngularGradient(
+                        colors: [shades.deep, shades.light],
+                        center: .center,
+                        startAngle: .degrees(0),
+                        endAngle: .degrees(360 * fraction)
+                    ),
+                    style: StrokeStyle(lineWidth: ring, lineCap: .butt)
+                )
+            // Round start cap drawn by hand: a round line cap there would pick up the gradient's
+            // far (light) end. The knob covers the other end.
+            Circle()
+                .fill(shades.deep)
+                .frame(width: ring, height: ring)
+                .offset(x: radius)
+        }
+        // Angle 0 is 3 o'clock; turn it to 12.
+        .rotationEffect(.degrees(-90))
+    }
+
     /// A dot at every whole number, sitting in the unfilled track like the reference design.
     private func ticks(radius: CGFloat, ring: CGFloat) -> some View {
         ForEach(1..<10, id: \.self) { mark in
@@ -88,7 +116,7 @@ struct RatingDial: View {
 
     private func knob(ring: CGFloat) -> some View {
         Circle()
-            .fill(tint)
+            .fill(RatingPalette.arcShades(for: value).light)
             .overlay(Circle().strokeBorder(Color.white, lineWidth: ring * 0.12))
             .frame(width: ring * 1.15, height: ring * 1.15)
             .shadow(color: .black.opacity(0.25), radius: ring * 0.15, y: ring * 0.05)

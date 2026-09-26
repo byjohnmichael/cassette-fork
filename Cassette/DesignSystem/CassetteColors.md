@@ -25,7 +25,9 @@ mode and does not live in `Assets.xcassets`.
 | 9 | `#46A758` green |
 | 10 | `#12A594` teal |
 
-Values in between are interpolated. Permitted uses: the rating dial's fill and knob, rating badges,
+Values in between are interpolated. On the dial the arc is shaded from a deeper version of the
+color (22% toward black) at its start to a lighter one (38% toward white) at the knob
+(`RatingPalette.arcShades`). Permitted uses: the rating dial's fill and knob, rating badges,
 and the verdict label in the rating sheet. Never for anything that is not a rating.
 
 ## Rules

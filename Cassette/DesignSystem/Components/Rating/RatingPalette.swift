@@ -26,21 +26,44 @@ enum RatingPalette {
 
     /// The color for a 0–10 rating, interpolated between the stops.
     static func color(for value: Double) -> Color {
+        let c = rgb(for: value)
+        return Color(red: c.red, green: c.green, blue: c.blue)
+    }
+
+    /// Two shades of a rating's color for the dial's arc: `deep` where the arc starts and `light`
+    /// at the knob. Same hue, so the ring still reads as one color.
+    static func arcShades(for value: Double) -> (deep: Color, light: Color) {
+        let c = rgb(for: value)
+        return (
+            deep: mixed(c, with: (0, 0, 0), amount: 0.22),
+            light: mixed(c, with: (1, 1, 1), amount: 0.38)
+        )
+    }
+
+    private static func rgb(for value: Double) -> (red: Double, green: Double, blue: Double) {
         let v = RatingScale.normalized(value)
         guard let upperIndex = stops.firstIndex(where: { $0.value >= v }), upperIndex > 0 else {
-            return color(of: stops[0])
+            return (stops[0].red, stops[0].green, stops[0].blue)
         }
         let lower = stops[upperIndex - 1]
         let upper = stops[upperIndex]
         let t = (v - lower.value) / (upper.value - lower.value)
-        return Color(
-            red: lower.red + (upper.red - lower.red) * t,
-            green: lower.green + (upper.green - lower.green) * t,
-            blue: lower.blue + (upper.blue - lower.blue) * t
+        return (
+            lower.red + (upper.red - lower.red) * t,
+            lower.green + (upper.green - lower.green) * t,
+            lower.blue + (upper.blue - lower.blue) * t
         )
     }
 
-    private static func color(of stop: Stop) -> Color {
-        Color(red: stop.red, green: stop.green, blue: stop.blue)
+    private static func mixed(
+        _ c: (red: Double, green: Double, blue: Double),
+        with target: (Double, Double, Double),
+        amount: Double
+    ) -> Color {
+        Color(
+            red: c.red + (target.0 - c.red) * amount,
+            green: c.green + (target.1 - c.green) * amount,
+            blue: c.blue + (target.2 - c.blue) * amount
+        )
     }
 }
