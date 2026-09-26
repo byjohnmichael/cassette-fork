@@ -7,6 +7,7 @@ import Foundation
 import OSLog
 import SwiftUI
 import SwiftData
+import SwiftSonic
 
 /// DI root. Creates and wires all services in dependency order.
 /// Passed into the SwiftUI environment via \.appContainer.
@@ -30,6 +31,7 @@ final class AppContainer {
     let nowPlayingService: any NowPlayingServiceProtocol
     let favoritesService: any FavoritesServiceProtocol
     let pinService: any PinServiceProtocol
+    let ratingService: RatingService
     let playlistService: any PlaylistServiceProtocol
     let radioService: any RadioServiceProtocol
     let toastService = ToastService()
@@ -120,6 +122,13 @@ final class AppContainer {
         nowPlayingService = nowPlaying
 
         favoritesService = FavoritesService(libraryService: library, serverState: serverState, modelContainer: modelContainer)
+        ratingService = RatingService(
+            modelContainer: modelContainer,
+            serverState: serverState,
+            pushToServer: { itemId, stars in
+                try await server.makeSwiftSonicClient().setRating(id: itemId, rating: stars)
+            }
+        )
         let pin = PinService(modelContainer: modelContainer)
         pinService = pin
         let playlist = PlaylistService(serverService: server, modelContainer: modelContainer, downloadService: download)
@@ -182,6 +191,7 @@ extension ModelContainer {
             QueueSnapshot.self,
             FavoriteRecord.self,
             PinnedItem.self,
+            RatingRecord.self,
             PlaybackSession.self, // kept for schema-mismatch migration safety; see session() below
             PlaybackEvent.self,
             CachedLyrics.self,
