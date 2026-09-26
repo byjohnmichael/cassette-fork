@@ -12,8 +12,11 @@ nonisolated enum RatedItemType: String, CaseIterable, Sendable {
     case artist
 }
 
-/// A user's 0.0–10.0 rating of a song, album or artist. Kept on the device only: Subsonic's
-/// `setRating` can hold nothing finer than whole 1–5 stars, so the server is not involved.
+/// A user's 0.0–10.0 rating of a song, album or artist.
+///
+/// The device copy is what the UI reads, so ratings show instantly and work offline. It is
+/// synced with the cassette-ratings service beside Navidrome (`server/cassette-ratings`), not
+/// with Subsonic's `setRating`, which holds nothing finer than whole 1–5 stars.
 @Model
 final class RatingRecord {
     @Attribute(.unique) var id: String  // "{serverId}:{type}:{itemId}"
@@ -21,15 +24,30 @@ final class RatingRecord {
     var itemId: String
     var serverId: UUID
     var value: Double
+    /// When the rating last changed, on whichever device changed it. Newest wins on sync.
     var updatedAt: Date
+    /// A local change the server has not acknowledged yet.
+    var needsSync: Bool = false
+    /// Cleared locally but not yet on the server. Kept until the deletion is pushed, then removed.
+    var isDeleted: Bool = false
 
-    init(itemType: RatedItemType, itemId: String, serverId: UUID, value: Double, updatedAt: Date = Date()) {
+    init(
+        itemType: RatedItemType,
+        itemId: String,
+        serverId: UUID,
+        value: Double,
+        updatedAt: Date = Date(),
+        needsSync: Bool = false,
+        isDeleted: Bool = false
+    ) {
         self.id = RatingRecord.compositeId(itemType: itemType, itemId: itemId, serverId: serverId)
         self.itemType = itemType.rawValue
         self.itemId = itemId
         self.serverId = serverId
         self.value = value
         self.updatedAt = updatedAt
+        self.needsSync = needsSync
+        self.isDeleted = isDeleted
     }
 
     nonisolated static func compositeId(itemType: RatedItemType, itemId: String, serverId: UUID) -> String {

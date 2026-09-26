@@ -111,7 +111,24 @@ final class AppContainer {
         nowPlayingService = nowPlaying
 
         favoritesService = FavoritesService(libraryService: library, serverState: serverState, modelContainer: modelContainer)
-        ratingService = RatingService(modelContainer: modelContainer, serverState: serverState)
+        let ratingServerState = serverState
+        ratingService = RatingService(
+            modelContainer: modelContainer,
+            serverState: serverState,
+            makeSyncClient: {
+                // The ratings service lives beside Navidrome at <server URL>/ratings/ and is reached
+                // with the same custom headers as the server itself.
+                guard let snapshot = await MainActor.run(body: { ratingServerState.activeServer }),
+                      let baseURL = URL(string: snapshot.baseURL),
+                      let creds = try? await server.activeCredentials() else { return nil }
+                return RatingServerClient(
+                    baseURL: baseURL,
+                    username: snapshot.username,
+                    password: creds.password,
+                    transport: CustomHeadersTransport(headers: creds.customHeaders)
+                )
+            }
+        )
         let pin = PinService(modelContainer: modelContainer)
         pinService = pin
         let playlist = PlaylistService(serverService: server, modelContainer: modelContainer, downloadService: download)
