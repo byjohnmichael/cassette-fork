@@ -22,10 +22,13 @@ struct ArtistRow: View {
             .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(artist.name)
-                    .font(.cassetteCellTitle)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                HStack(spacing: CassetteSpacing.xs) {
+                    Text(artist.name)
+                        .font(.cassetteCellTitle)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    ItemRatingBadge(itemType: .artist, itemId: artist.id)
+                }
                 if let count = artist.albumCount {
                     Text("\(count) albums")
                         .font(.cassetteCaption)
@@ -37,5 +40,6 @@ struct ArtistRow: View {
         }
         .padding(.vertical, CassetteSpacing.xs)
         .contentShape(Rectangle())
+        .artistContextMenu(artistId: artist.id, artistName: artist.name)
     }
 }

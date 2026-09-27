@@ -420,6 +420,8 @@ struct AlbumDetailView: View {
                     .foregroundStyle(headerTextColor)
                     .multilineTextAlignment(.center)
                     .padding(.bottom, CassetteSpacing.xs)
+                ItemRatingBadge(itemType: .album, itemId: albumId, font: .cassetteCaption)
+                    .padding(.bottom, CassetteSpacing.xs)
                 if vm == nil {
                     SkeletonBlock(width: 140, height: 18, cornerRadius: 4)
                         .padding(.bottom, CassetteSpacing.s)

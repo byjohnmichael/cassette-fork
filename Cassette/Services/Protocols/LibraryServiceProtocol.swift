@@ -128,10 +128,6 @@ protocol LibraryServiceProtocol: AnyObject, Sendable {
     /// that some Subsonic server implementations trigger on `getArtistInfo`.
     func getArtistInfo(forArtistID artistID: String, count: Int) async throws -> ArtistInfo
 
-    /// Returns the MusicBrainz ID for the given Subsonic artist ID.
-    /// Delegates to `getArtistInfo(forArtistID:count:)` and extracts `musicBrainzId`.
-    func getArtistMBID(forArtistID artistID: String) async throws -> String?
-
     /// Returns the first library artist whose name matches case-insensitively.
     /// Uses a lazy in-memory index built on first call; subsequent lookups are O(1).
     func findArtist(byName name: String) async -> ArtistID3?

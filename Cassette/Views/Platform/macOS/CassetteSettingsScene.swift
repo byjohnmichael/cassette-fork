@@ -34,7 +34,7 @@ struct CassetteSettingsScene: Scene {
 // MARK: - Tab container
 
 private enum SettingsTab: Int {
-    case general, playback, server, cache, integrations, about
+    case general, playback, server, cache, about
 }
 
 struct MacOSSettingsView: View {
@@ -57,10 +57,6 @@ struct MacOSSettingsView: View {
             CacheSettingsTab()
                 .tabItem { Label("Cache", systemImage: "externaldrive") }
                 .tag(SettingsTab.cache)
-
-            IntegrationsSettingsTab()
-                .tabItem { Label("Integrations", systemImage: "link.circle") }
-                .tag(SettingsTab.integrations)
 
             AboutSettingsTab()
                 .tabItem { Label("About", systemImage: "info.circle") }
@@ -170,55 +166,6 @@ private struct CacheSettingsTab: View {
                 )
             }
             await downloadsVM?.loadData()
-        }
-    }
-}
-
-// MARK: - Integrations tab
-
-private struct IntegrationsSettingsTab: View {
-    @State private var showListenBrainz = false
-    @State private var showProviders = false
-
-    var body: some View {
-        Form {
-            Section {
-                Button { showListenBrainz = true } label: {
-                    HStack {
-                        Label("ListenBrainz", systemImage: "link.circle")
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                Button { showProviders = true } label: {
-                    HStack {
-                        Label("Open Releases In", systemImage: "arrow.up.right.square")
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .formStyle(.grouped)
-        .frame(maxWidth: 480)
-        .sheet(isPresented: $showListenBrainz) {
-            ListenBrainzSettingsView()
-                .frame(minWidth: 400, minHeight: 300)
-        }
-        .sheet(isPresented: $showProviders) {
-            ExternalProvidersSettingsView()
-                .frame(minWidth: 400, minHeight: 300)
         }
     }
 }

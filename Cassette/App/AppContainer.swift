@@ -30,6 +30,7 @@ final class AppContainer {
     let nowPlayingService: any NowPlayingServiceProtocol
     let favoritesService: any FavoritesServiceProtocol
     let pinService: any PinServiceProtocol
+    let ratingService: RatingService
     let playlistService: any PlaylistServiceProtocol
     let radioService: any RadioServiceProtocol
     let toastService = ToastService()
@@ -40,16 +41,11 @@ final class AppContainer {
     let statsService: StatsService
     private let _player: PlayerService
     let wrappedPlaylistService: WrappedPlaylistService
-    /// Weekly mood playlists. Always available: AudioMuse powers them when configured, the
-    /// server's own tags when not.
+    /// Weekly mood playlists, built from the server's own tags.
     let moodPlaylistService: MoodPlaylistService
     let lyricsService: LyricsService
     let widgetSyncService: WidgetSyncService
     let recommendationService: RecommendationService
-    let listenBrainzService: ListenBrainzService
-    let externalProvidersStore = ExternalProvidersStore()
-    let externalArtworkCache = ExternalArtworkCache()
-    let externalArtistImageResolver = ExternalArtistImageResolver()
     let searchHistoryService: SearchHistoryService
     let replayGainService = ReplayGainService()
     let replayGainSettings = ReplayGainSettings()
@@ -95,7 +91,6 @@ final class AppContainer {
         }
         moodPlaylistService = MoodPlaylistService(
             serverService: server,
-            serverState: serverState,
             libraryService: library,
             coverApplier: moodCovers
         )
@@ -108,11 +103,7 @@ final class AppContainer {
         )
         mediaResolver = resolver
 
-        let lbClient = ListenBrainzClient(transport: URLSessionListenBrainzTransport())
-        let lb = ListenBrainzService(client: lbClient, keychain: keychain)
-        listenBrainzService = lb
-
-        let player = PlayerService(state: playerState, mediaResolver: resolver, serverService: server, sessionService: sessionService, artworkImageCache: artworkImageCache, libraryService: library, audioStreamCache: cache, downloadService: download, cacheSettings: cacheSettings, replayGainSettings: replayGainSettings, crossfadeSettings: crossfadeSettings, toastService: toastService, statsService: stats, listenBrainzService: lb)
+        let player = PlayerService(state: playerState, mediaResolver: resolver, serverService: server, sessionService: sessionService, artworkImageCache: artworkImageCache, libraryService: library, audioStreamCache: cache, downloadService: download, cacheSettings: cacheSettings, replayGainSettings: replayGainSettings, crossfadeSettings: crossfadeSettings, toastService: toastService, statsService: stats)
         _player = player
         playerService = player
 
@@ -120,6 +111,24 @@ final class AppContainer {
         nowPlayingService = nowPlaying
 
         favoritesService = FavoritesService(libraryService: library, serverState: serverState, modelContainer: modelContainer)
+        let ratingServerState = serverState
+        ratingService = RatingService(
+            modelContainer: modelContainer,
+            serverState: serverState,
+            makeSyncClient: {
+                // The ratings service lives beside Navidrome at <server URL>/ratings/ and is reached
+                // with the same custom headers as the server itself.
+                guard let snapshot = await MainActor.run(body: { ratingServerState.activeServer }),
+                      let baseURL = URL(string: snapshot.baseURL),
+                      let creds = try? await server.activeCredentials() else { return nil }
+                return RatingServerClient(
+                    baseURL: baseURL,
+                    username: snapshot.username,
+                    password: creds.password,
+                    transport: CustomHeadersTransport(headers: creds.customHeaders)
+                )
+            }
+        )
         let pin = PinService(modelContainer: modelContainer)
         pinService = pin
         let playlist = PlaylistService(serverService: server, modelContainer: modelContainer, downloadService: download)
@@ -144,14 +153,9 @@ final class AppContainer {
         }
         Task { [playlist] in await playlist.retryMissingPlaylistDownloads() }
 
-        let subsonicProvider = SubsonicRecommendationProvider(libraryService: library)
-        let lbProvider = ListenBrainzRecommendationProvider(client: lbClient, service: lb, libraryService: library)
-        recommendationService = RecommendationService(providers: [lbProvider, subsonicProvider])
+        recommendationService = RecommendationService(providers: [SubsonicRecommendationProvider(libraryService: library)])
 
         searchHistoryService = SearchHistoryService(container: modelContainer)
-
-        Task { await listenBrainzService.loadPersistedState() }
-        Task { await externalArtworkCache.runGarbageCollection() }
     }
 
     /// Awaited by CassetteApp's `.task` before the UI appears, ensuring
@@ -182,6 +186,7 @@ extension ModelContainer {
             QueueSnapshot.self,
             FavoriteRecord.self,
             PinnedItem.self,
+            RatingRecord.self,
             PlaybackSession.self, // kept for schema-mismatch migration safety; see session() below
             PlaybackEvent.self,
             CachedLyrics.self,

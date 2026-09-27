@@ -6,12 +6,13 @@
 import Testing
 import Foundation
 import SwiftSonic
-import SwiftMuse
 @testable import Cassette
 
 // MARK: - Stubs
 
 /// Records every call and replays a per-mood outcome keyed on the mood.
+private struct StubFailure: Error {}
+
 private final class ProviderStub: MoodTrackProvider, @unchecked Sendable {
     enum Outcome { case tracks(Int), empty, failure }
 
@@ -20,7 +21,7 @@ private final class ProviderStub: MoodTrackProvider, @unchecked Sendable {
     private var _prepares = 0
     var outcomes: [Mood: Outcome] = [:]
     var defaultOutcome: Outcome = .tracks(75)
-    var kind: MoodSourceKind = .sonic
+    var kind: MoodSourceKind = .tags
 
     var requested: [Mood] { lock.withLock { _requested } }
     var prepares: Int { lock.withLock { _prepares } }
@@ -32,7 +33,7 @@ private final class ProviderStub: MoodTrackProvider, @unchecked Sendable {
         switch outcomes[mood] ?? defaultOutcome {
         case .tracks(let n): return (0..<n).map { "track-\($0)" }
         case .empty:         return []
-        case .failure:       throw SwiftMuseError.transport("stubbed failure")
+        case .failure:       throw StubFailure()
         }
     }
 }
@@ -159,7 +160,7 @@ struct MoodPlaylistServiceTests {
         let h = try Harness()
         let outcome = await h.service.runWeeklySyncIfNeeded(serverId: h.serverId, calendar: utc, currentDate: wednesday)
 
-        #expect(outcome == .finished(source: .sonic, refreshed: Mood.allCases, kept: []))
+        #expect(outcome == .finished(source: .tags, refreshed: Mood.allCases, kept: []))
         #expect(h.provider.requested.count == 5)
         #expect(h.playlists.replacements.count == 5)
         #expect(h.provider.prepares == 1, "prepare runs once per batch, not per mood")
@@ -182,7 +183,7 @@ struct MoodPlaylistServiceTests {
         _ = await h.service.runWeeklySyncIfNeeded(serverId: h.serverId, calendar: utc, currentDate: wednesday)
         let outcome = await h.service.runWeeklySyncIfNeeded(serverId: h.serverId, calendar: utc, currentDate: nextWednesday)
 
-        #expect(outcome == .finished(source: .sonic, refreshed: Mood.allCases, kept: []))
+        #expect(outcome == .finished(source: .tags, refreshed: Mood.allCases, kept: []))
         #expect(h.playlists.replacements.count == 10)
     }
 
@@ -193,7 +194,7 @@ struct MoodPlaylistServiceTests {
 
         let outcome = await h.service.runWeeklySyncIfNeeded(serverId: h.serverId, calendar: utc, currentDate: wednesday)
 
-        #expect(outcome == .finished(source: .sonic, refreshed: Mood.allCases.filter { $0 != .workout }, kept: [.workout]))
+        #expect(outcome == .finished(source: .tags, refreshed: Mood.allCases.filter { $0 != .workout }, kept: [.workout]))
         // Four playlists rewritten — Workout's was never touched, so last week's is still there.
         #expect(h.playlists.replacements.count == 4)
         #expect(h.preferences.syncedCycle(mood: .workout, serverId: h.serverId) == nil)
@@ -207,7 +208,7 @@ struct MoodPlaylistServiceTests {
 
         let outcome = await h.service.runWeeklySyncIfNeeded(serverId: h.serverId, calendar: utc, currentDate: wednesday)
 
-        #expect(outcome == .finished(source: .sonic, refreshed: Mood.allCases.filter { $0 != .night }, kept: [.night]))
+        #expect(outcome == .finished(source: .tags, refreshed: Mood.allCases.filter { $0 != .night }, kept: [.night]))
         #expect(!h.playlists.replacements.contains { $0.songIds.isEmpty })
     }
 
@@ -222,7 +223,7 @@ struct MoodPlaylistServiceTests {
         let outcome = await h.service.runWeeklySyncIfNeeded(
             serverId: h.serverId, calendar: utc, currentDate: wednesday.addingTimeInterval(7200))
 
-        #expect(outcome == .finished(source: .sonic, refreshed: [.workout], kept: []))
+        #expect(outcome == .finished(source: .tags, refreshed: [.workout], kept: []))
         #expect(h.provider.requested.filter { $0 == .chill }.count == 1, "a succeeded mood is not re-queried")
     }
 
@@ -247,7 +248,7 @@ struct MoodPlaylistServiceTests {
 
         let outcome = await h.service.runWeeklySyncIfNeeded(serverId: h.serverId, calendar: utc, currentDate: wednesday)
 
-        #expect(outcome == .finished(source: .sonic, refreshed: [], kept: Mood.allCases))
+        #expect(outcome == .finished(source: .tags, refreshed: [], kept: Mood.allCases))
         for mood in Mood.allCases {
             #expect(h.preferences.syncedCycle(mood: mood, serverId: h.serverId) == nil)
         }
@@ -262,7 +263,7 @@ struct MoodPlaylistServiceTests {
 
         let outcome = await h.service.runWeeklySyncIfNeeded(serverId: h.serverId, calendar: utc, currentDate: wednesday)
 
-        #expect(outcome == .finished(source: .sonic, refreshed: [], kept: Mood.allCases))
+        #expect(outcome == .finished(source: .tags, refreshed: [], kept: Mood.allCases))
         for mood in Mood.allCases {
             #expect(h.preferences.syncedCycle(mood: mood, serverId: h.serverId) == nil,
                     "\(mood.rawValue) must be retried, not marked done")
@@ -286,7 +287,7 @@ struct MoodPlaylistServiceTests {
         #expect(h.playlists.replacements.allSatisfy { $0.playlistId.hasPrefix("existing-") })
     }
 
-    @Test("no AudioMuse configured means the feature is simply absent")
+    @Test("no provider means the feature is simply absent")
     func notConfigured() async throws {
         let playlists = PlaylistStub()
         let service = MoodPlaylistService(
@@ -360,12 +361,11 @@ struct MoodPlaylistServiceTests {
         _ = await h.service.runWeeklySyncIfNeeded(serverId: h.serverId, calendar: utc, currentDate: wednesday)
         #expect(h.playlists.replacements.count == 5)
 
-        // Connecting AudioMuse two days later must not leave the tag-built playlists in place
-        // until the following Wednesday.
+        // A rebuild two days later must not wait until the following Wednesday.
         let outcome = await h.service.rebuildNow(
             serverId: h.serverId, calendar: utc, currentDate: date("2026-07-17T10:00:00Z"))
 
-        #expect(outcome == .finished(source: .sonic, refreshed: Mood.allCases, kept: []))
+        #expect(outcome == .finished(source: .tags, refreshed: Mood.allCases, kept: []))
         #expect(h.playlists.replacements.count == 10)
     }
 
@@ -391,14 +391,5 @@ struct MoodPlaylistServiceTests {
         _ = await h.service.rebuildNow(serverId: h.serverId, calendar: utc, currentDate: wednesday.addingTimeInterval(60))
 
         #expect(h.playlists.created.count == createdFirst, "rebuilding must not orphan the old playlists")
-    }
-
-    @Test("every mood carries a distinct English prompt for the sonic provider")
-    func promptsAreDistinct() {
-        let queries = Mood.allCases.map(\.query)
-        #expect(Set(queries).count == queries.count)
-        // ASCII-only is the check that matters: these are fed to CLAP, which embeds against
-        // English, so a localised prompt would quietly degrade every match.
-        #expect(queries.allSatisfy { $0.allSatisfy(\.isASCII) })
     }
 }

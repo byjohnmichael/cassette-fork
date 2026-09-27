@@ -1,0 +1,15 @@
+# Add this service next to your existing navidrome service (same compose file / network).
+services:
+  cassette-ratings:
+    build: ./server/cassette-ratings   # path to this folder in your cassette-fork checkout
+    container_name: cassette-ratings
+    restart: unless-stopped
+    environment:
+      # How this container reaches Navidrome directly (not through the public URL).
+      NAVIDROME_URL: http://navidrome:4533
+    volumes:
+      - ./cassette-ratings-data:/data   # the SQLite database lives here — back it up
+    # No public port needed: the reverse proxy reaches it on the Docker network.
+    # If your proxy runs on the host instead, publish it on localhost only:
+    # ports:
+    #   - "127.0.0.1:8000:8000"

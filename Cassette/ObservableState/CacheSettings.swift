@@ -14,12 +14,28 @@ import Observation
 final class CacheSettings {
     // MARK: - Storage (observation ignored)
 
+    @ObservationIgnored private var _isEnabled: Bool
     @ObservationIgnored private var _maxTracks: Int
     @ObservationIgnored private var _cacheFormat: CacheFormat
     @ObservationIgnored private var _cacheOverCellular: Bool
     @ObservationIgnored private var _downloadFormat: DownloadFormat
 
     // MARK: - Visible properties (manual observation hooks)
+
+    /// Whether recently played tracks are kept in the sliding-window cache. Off by default:
+    /// the user opts in from Settings. Does not affect next-track prefetch, which playback needs.
+    var isEnabled: Bool {
+        get {
+            access(keyPath: \.isEnabled)
+            return _isEnabled
+        }
+        set {
+            withMutation(keyPath: \.isEnabled) {
+                _isEnabled = newValue
+            }
+            UserDefaults.standard.set(newValue, forKey: Self.isEnabledKey)
+        }
+    }
 
     var maxTracks: Int {
         get {
@@ -78,6 +94,7 @@ final class CacheSettings {
 
     // MARK: - Defaults & keys
 
+    static let defaultIsEnabled: Bool = false
     static let defaultMaxTracks: Int = 10
     static let minMaxTracks: Int = 1
     static let maxMaxTracks: Int = 10
@@ -85,6 +102,7 @@ final class CacheSettings {
     static let defaultCacheOverCellular: Bool = false
     static let defaultDownloadFormat: DownloadFormat = .default
 
+    private static let isEnabledKey = "cassette.cache.enabled"
     private static let maxTracksKey = "cassette.cache.maxTracks"
     private static let cacheFormatKey = "cassette.cache.format"
     private static let cacheOverCellularKey = "cassette.cache.cellular"
@@ -93,6 +111,8 @@ final class CacheSettings {
     // MARK: - Init
 
     init() {
+        self._isEnabled = UserDefaults.standard.object(forKey: Self.isEnabledKey) as? Bool ?? Self.defaultIsEnabled
+
         let loadedMaxTracks = UserDefaults.standard.integer(forKey: Self.maxTracksKey)
         self._maxTracks = (loadedMaxTracks == 0)
             ? Self.defaultMaxTracks

@@ -18,7 +18,7 @@ final class TagLibraryStub: LibraryServiceProtocol, @unchecked Sendable {
     /// Songs returned per genre. Absent genres return empty, like a real server.
     var songsPerGenre: [String: [Song]] = [:]
     var randomPool: [Song] = []
-    /// Songs returned by `search`, used by SubsonicTrackResolver.
+    /// Songs returned by `search`.
     var searchResults: [Song] = []
     private var _searches: [String] = []
     var searches: [String] { lock.withLock { _searches } }
@@ -36,7 +36,7 @@ final class TagLibraryStub: LibraryServiceProtocol, @unchecked Sendable {
         return randomPool
     }
 
-    /// Used by SubsonicTrackResolver when the sonic provider falls back to matching by name.
+    /// Name lookups.
     func search(_ query: String) async throws -> SearchResult3 {
         lock.withLock { _searches.append(query) }
         let songs = searchResults.map {
@@ -67,7 +67,6 @@ final class TagLibraryStub: LibraryServiceProtocol, @unchecked Sendable {
     func savePlayQueue(songIds: [String], currentIndex: Int, positionSeconds: Double) async throws {}
     func getPlayQueue() async throws -> SavedPlayQueue? { nil }
     func getArtistInfo(forArtistID artistID: String, count: Int) async throws -> ArtistInfo { throw URLError(.unknown) }
-    func getArtistMBID(forArtistID artistID: String) async throws -> String? { nil }
     func findArtist(byName name: String) async -> ArtistID3? { nil }
     func topSongs(artist: String, count: Int) async throws -> [DisplayableSong] { [] }
     func instantMix(from seed: InstantMixSeed, count: Int) async throws -> [DisplayableSong] { [] }

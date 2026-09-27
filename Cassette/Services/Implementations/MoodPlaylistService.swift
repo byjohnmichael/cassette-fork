@@ -5,7 +5,6 @@
 
 import Foundation
 import SwiftSonic
-import SwiftMuse
 import OSLog
 
 // MARK: - Results
@@ -35,10 +34,7 @@ nonisolated enum MoodSkipReason: Error, Sendable, Equatable {
 
 /// Maintains five server-side mood playlists, refreshed weekly.
 ///
-/// Tracks come from AudioMuse's sonic analysis when it is configured, and from the server's own
-/// MOOD/genre/BPM tags when it is not — so the feature exists on every server, and is better on
-/// some. The choice is made once per run and recorded, because it changes how good the result is
-/// and the user deserves to know which one they got.
+/// Tracks come from the server's own MOOD/genre/BPM tags, so the feature exists on every server.
 ///
 /// Modelled on WrappedPlaylistService: a cadence marker in UserDefaults, playlists owned by the
 /// server, and atomic replacement through createPlaylist's replace mode. The differences that
@@ -50,8 +46,6 @@ nonisolated enum MoodSkipReason: Error, Sendable, Equatable {
 /// - **Sequential, not parallel.** Instant Mix taught us that concurrent similarity queries on a
 ///   self-hosted box contend hard — eight parallel calls each took 22s against 12.8s solo. Five
 ///   moods one after another is friendlier and, on that evidence, probably not slower.
-/// - **A prepare step.** AudioMuse evicts the CLAP model after ten minutes idle, so a weekly job
-///   always arrives cold and pays the load up front rather than inside the first mood's timeout.
 actor MoodPlaylistService {
     private let preferences: MoodPreferences
     private let makePlaylistClient: @Sendable () async throws -> any PlaylistSyncClient
@@ -75,11 +69,9 @@ actor MoodPlaylistService {
         self.preferences = preferences
     }
 
-    /// Production wiring. AudioMuse when it is configured and reachable-looking, the server's own
-    /// tags otherwise — so the moods exist on every server, just better on some.
+    /// Production wiring: moods are built from the server's own tags.
     init(
         serverService: any ServerServiceProtocol,
-        serverState: ServerState,
         libraryService: any LibraryServiceProtocol,
         coverApplier: (@Sendable (PlaylistGradientSpec, String) async -> Void)? = nil,
         preferences: MoodPreferences = MoodPreferences()
@@ -87,20 +79,7 @@ actor MoodPlaylistService {
         self.preferences = preferences
         self.applyCover = coverApplier
         self.makePlaylistClient = { try await serverService.makeSwiftSonicClient() }
-        self.makeProvider = {
-            if let urlString = await MainActor.run(body: { serverState.activeServer?.audioMuseURL }),
-               let credentials = try? await serverService.activeCredentials(),
-               let config = SwiftMuseConfiguration(
-                   urlString: urlString,
-                   token: credentials.audioMuseToken,
-                   serverScoping: .defaultServer,
-                   logSubsystem: "app.cassette.moodplaylists"
-               ) {
-                let client = SwiftMuseClient(configuration: config)
-                return AudioMuseTrackProvider(client: client, resolver: SubsonicTrackResolver(libraryService: libraryService))
-            }
-            return LibraryTagTrackProvider(libraryService: libraryService)
-        }
+        self.makeProvider = { LibraryTagTrackProvider(libraryService: libraryService) }
     }
 
     // MARK: - Sync
@@ -162,9 +141,7 @@ actor MoodPlaylistService {
 
     /// Rebuilds all five playlists now, whatever the weekly cadence says.
     ///
-    /// Called when the track source changes: connecting AudioMuse should replace the tag-built
-    /// playlists immediately rather than leaving the user to wonder until Wednesday whether it took
-    /// effect. Playlist ids are kept, so the existing playlists are rewritten in place.
+    /// Playlist ids are kept, so the existing playlists are rewritten in place.
     @discardableResult
     func rebuildNow(serverId: String, calendar: Calendar = .current, currentDate: Date = Date()) async -> MoodSyncOutcome {
         preferences.markAllDue(serverId: serverId)
@@ -257,8 +234,8 @@ actor MoodPlaylistService {
         preferences.lastSource(serverId: serverId)
     }
 
-    /// Clears local state when the user disconnects AudioMuse. The server playlists are left in
-    /// place — they are the user's now, and deleting them would be a surprise.
+    /// Clears local state for a server. The server playlists are left in place — they are the
+    /// user's now, and deleting them would be a surprise.
     func forgetLocalState(serverId: String) {
         preferences.reset(serverId: serverId)
     }

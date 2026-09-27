@@ -186,6 +186,28 @@ SF Pro Rounded semibold header for use inside scroll views (not inside `List`/`S
 SectionHeader("Recent Albums")
 ```
 
+### Ratings (`Components/Rating/`)
+
+Songs, albums and artists can be rated 0.0–10.0. Values come from `RatingService`.
+
+- `RatingDial` — circular slider bound to a `Double`. Drag around the ring to set the value.
+- `RatingSheet` — full-height sheet with the dial, fine-tune ± buttons, Save and Clear. Present it
+  with `.ratingSheet(target:)` and a `RatingTarget?` state.
+- `RateMenuButton` — the "Rate…" context-menu item; shows the current rating once one exists.
+- `ItemRatingBadge` — the rating capsule next to an item's name; renders nothing when unrated.
+
+```swift
+@State private var ratingTarget: RatingTarget?
+
+row
+    .contextMenu {
+        RateMenuButton(itemType: .album, itemId: album.id) {
+            ratingTarget = RatingTarget(itemType: .album, itemId: album.id, title: album.name)
+        }
+    }
+    .ratingSheet(target: $ratingTarget)
+```
+
 ---
 
 ## Adding a new component

@@ -47,7 +47,6 @@ private final class LibraryStub: LibraryServiceProtocol {
     func savePlayQueue(songIds: [String], currentIndex: Int, positionSeconds: Double) async throws { throw URLError(.unknown) }
     func getPlayQueue() async throws -> SavedPlayQueue? { nil }
     func getArtistInfo(forArtistID artistID: String, count: Int) async throws -> ArtistInfo { throw URLError(.unknown) }
-    func getArtistMBID(forArtistID artistID: String) async throws -> String? { nil }
     func findArtist(byName name: String) async -> ArtistID3? { nil }
     func topSongs(artist: String, count: Int) async throws -> [DisplayableSong] { throw URLError(.unknown) }
     func instantMix(from seed: InstantMixSeed, count: Int) async throws -> [DisplayableSong] { throw URLError(.unknown) }

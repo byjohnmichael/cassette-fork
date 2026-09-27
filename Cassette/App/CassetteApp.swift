@@ -132,6 +132,7 @@ struct CassetteApp: App {
                 await newContainer.serverService.loadPersistedState()
                 Logger.boot.notice("🟡 loadPersistedState() done — activeServer = \(String(describing: newContainer.serverState.activeServer?.baseURL), privacy: .public)")
                 await newContainer.playerService.restoreSession()
+                newContainer.ratingService.requestSync()
                 Task { await runCoverArtGarbageCollection(container: newContainer) }
                 // After the collector, so it never races the pass that decides what is orphaned.
                 Task { await runOfflineCoverHeal(container: newContainer) }
@@ -150,7 +151,7 @@ struct CassetteApp: App {
             .task(id: container?.serverState.isOnline) {
                 guard let c = container, c.serverState.isOnline else { return }
                 await c.playerService.handleNetworkRestored()
-                await c.listenBrainzService.flushOfflineQueue()
+                c.ratingService.requestSync()
             }
             #if os(macOS)
             .frame(minHeight: 580)

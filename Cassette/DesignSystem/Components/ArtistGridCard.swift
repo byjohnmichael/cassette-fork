@@ -35,15 +35,19 @@ struct ArtistGridCard: View {
                 .lineLimit(1)
                 .multilineTextAlignment(.center)
 
-            if let count = artist.albumCount {
-                Text("\(count) albums")
-                    .font(.cassetteCaption)
-                    .foregroundStyle(.secondary)
+            HStack(spacing: CassetteSpacing.xs) {
+                if let count = artist.albumCount {
+                    Text("\(count) albums")
+                        .font(.cassetteCaption)
+                        .foregroundStyle(.secondary)
+                }
+                ItemRatingBadge(itemType: .artist, itemId: artist.id)
             }
         }
         .frame(maxWidth: .infinity)
         #if os(macOS)
         .onHover { isHovered = $0 }
         #endif
+        .artistContextMenu(artistId: artist.id, artistName: artist.name)
     }
 }

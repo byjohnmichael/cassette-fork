@@ -48,7 +48,7 @@ Licensed under MPL-2.0.
 - **Cassette Wrapped** — a yearly recap of your listening
 
 **Integrations & extras**
-- **ListenBrainz** — scrobble your listens and surface recommendations (fresh releases, similar artists)
+
 - **Home-screen widgets** (iOS)
 - **Discord Rich Presence** — *experimental / pre-alpha*; shows your now-playing in Discord through the companion helper, [cassette-discord-rpc](https://github.com/CassetteLab/cassette-discord-rpc)
 

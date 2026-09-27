@@ -13,9 +13,6 @@ nonisolated struct ServerSnapshot: Sendable, Equatable {
     let baseURL: String
     let username: String
     let serverVersion: String?
-    /// Base URL of this server's AudioMuse-AI instance, or nil when none is configured.
-    /// Mirrored here so views can show or hide the mood features without a SwiftData fetch.
-    let audioMuseURL: String?
     /// The library browsing is scoped to, or nil for all of them. Mirrored here so views and the
     /// library service can read the scope without a SwiftData fetch.
     let selectedMusicFolderId: String?
@@ -33,7 +30,6 @@ nonisolated struct ServerSnapshot: Sendable, Equatable {
         self.baseURL = config.baseURL
         self.username = config.username
         self.serverVersion = config.serverVersion
-        self.audioMuseURL = config.audioMuseURL
         self.selectedMusicFolderId = config.selectedMusicFolderId
         self.hiddenPlaylistKinds = config.hiddenPlaylistKinds
     }

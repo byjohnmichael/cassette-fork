@@ -553,10 +553,6 @@ actor LibraryService: LibraryServiceProtocol {
         }
     }
 
-    func getArtistMBID(forArtistID artistID: String) async throws -> String? {
-        try await getArtistInfo(forArtistID: artistID, count: 20).musicBrainzId
-    }
-
     func findArtist(byName name: String) async -> ArtistID3? {
         if artistNameIndex == nil {
             if indexBuildTask == nil {

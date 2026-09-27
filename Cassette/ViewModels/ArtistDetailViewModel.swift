@@ -16,7 +16,6 @@ final class ArtistDetailViewModel {
     var error: UserFacingError?
     var similarArtists: [SimilarArtistRecommendation] = []
     var isLoadingSimilarArtists = false
-    var outOfLibraryArtistImages: [String: URL?] = [:]
     /// Most-played songs (getTopSongs). Empty on bare self-hosted servers → the view hides the section.
     var topSongs: [DisplayableSong] = []
     /// Starts true so the section shows a skeleton until the first load resolves (then empty → hidden).
@@ -47,7 +46,6 @@ final class ArtistDetailViewModel {
     private let libraryService: any LibraryServiceProtocol
     private let downloadService: any DownloadServiceProtocol
     private let recommendationService: RecommendationService
-    private let imageResolver: ExternalArtistImageResolver
     private let serverState: ServerState
 
     init(
@@ -56,7 +54,6 @@ final class ArtistDetailViewModel {
         libraryService: any LibraryServiceProtocol,
         downloadService: any DownloadServiceProtocol,
         recommendationService: RecommendationService,
-        imageResolver: ExternalArtistImageResolver,
         serverState: ServerState
     ) {
         self.artistId = artistId
@@ -64,7 +61,6 @@ final class ArtistDetailViewModel {
         self.libraryService = libraryService
         self.downloadService = downloadService
         self.recommendationService = recommendationService
-        self.imageResolver = imageResolver
         self.serverState = serverState
     }
 
@@ -199,17 +195,10 @@ final class ArtistDetailViewModel {
         similarArtists = []
         defer { isLoadingSimilarArtists = false }
         do {
-            similarArtists = try await recommendationService.similarArtists(to: artistId)
+            // Only artists in the library: the rest would need an outside service to show or open.
+            similarArtists = try await recommendationService.similarArtists(to: artistId).filter(\.inLibrary)
         } catch {
             Logger.recommendations.warning("similarArtists failed for \(self.artistId): \(error)")
-        }
-        Task { await loadOutOfLibraryImages() }
-    }
-
-    private func loadOutOfLibraryImages() async {
-        for rec in similarArtists where !rec.inLibrary {
-            let url = await imageResolver.resolveImageURL(for: rec)
-            outOfLibraryArtistImages[rec.id] = url
         }
     }
 }
