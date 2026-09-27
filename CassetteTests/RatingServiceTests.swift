@@ -79,7 +79,7 @@ struct RatingServiceTests {
         #expect(service.rating(for: .artist, itemId: "ar-1") == nil)
         let records = try ModelContext(container).fetch(FetchDescriptor<RatingRecord>())
         #expect(records.count == 1)
-        #expect(records.first?.isDeleted == true)
+        #expect(records.first?.isTombstone == true)
         #expect(records.first?.needsSync == true)
 
         // A fresh instance must not resurrect it.

@@ -51,7 +51,7 @@ final class RatingService {
         self.defaults = defaults
 
         let records = (try? ctx.fetch(FetchDescriptor<RatingRecord>(
-            predicate: #Predicate<RatingRecord> { !$0.isDeleted }
+            predicate: #Predicate<RatingRecord> { !$0.isTombstone }
         ))) ?? []
         values = Dictionary(records.map { ($0.id, $0.value) }, uniquingKeysWith: { _, last in last })
     }
@@ -74,7 +74,7 @@ final class RatingService {
         if let existing = fetchRecord(id: compositeId) {
             existing.value = normalized
             existing.updatedAt = Date()
-            existing.isDeleted = false
+            existing.isTombstone = false
             existing.needsSync = true
         } else {
             modelContext.insert(RatingRecord(
@@ -94,7 +94,7 @@ final class RatingService {
 
         // Kept as a tombstone until the server has the deletion, so other devices learn of it.
         if let existing = fetchRecord(id: compositeId) {
-            existing.isDeleted = true
+            existing.isTombstone = true
             existing.updatedAt = Date()
             existing.needsSync = true
             try? modelContext.save()
@@ -148,7 +148,7 @@ final class RatingService {
             return (id: record.id, change: RatingChange(
                 itemType: type,
                 itemId: record.itemId,
-                value: record.isDeleted ? nil : record.value,
+                value: record.isTombstone ? nil : record.value,
                 updatedAt: Self.milliseconds(record.updatedAt)
             ))
         }
@@ -159,7 +159,7 @@ final class RatingService {
             // change stays pending and goes out on the next pass.
             guard let record = fetchRecord(id: compositeId),
                   Self.milliseconds(record.updatedAt) == change.updatedAt else { continue }
-            if record.isDeleted {
+            if record.isTombstone {
                 modelContext.delete(record)
             } else {
                 record.needsSync = false
@@ -205,7 +205,7 @@ final class RatingService {
         if let local {
             local.value = value
             local.updatedAt = updatedAt
-            local.isDeleted = false
+            local.isTombstone = false
             local.needsSync = false
         } else {
             modelContext.insert(RatingRecord(

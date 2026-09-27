@@ -29,7 +29,7 @@ final class RatingRecord {
     /// A local change the server has not acknowledged yet.
     var needsSync: Bool = false
     /// Cleared locally but not yet on the server. Kept until the deletion is pushed, then removed.
-    var isDeleted: Bool = false
+    var isTombstone: Bool = false
 
     init(
         itemType: RatedItemType,
@@ -38,7 +38,7 @@ final class RatingRecord {
         value: Double,
         updatedAt: Date = Date(),
         needsSync: Bool = false,
-        isDeleted: Bool = false
+        isTombstone: Bool = false
     ) {
         self.id = RatingRecord.compositeId(itemType: itemType, itemId: itemId, serverId: serverId)
         self.itemType = itemType.rawValue
@@ -47,7 +47,7 @@ final class RatingRecord {
         self.value = value
         self.updatedAt = updatedAt
         self.needsSync = needsSync
-        self.isDeleted = isDeleted
+        self.isTombstone = isTombstone
     }
 
     nonisolated static func compositeId(itemType: RatedItemType, itemId: String, serverId: UUID) -> String {
