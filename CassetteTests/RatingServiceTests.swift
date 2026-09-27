@@ -21,8 +21,8 @@ struct RatingScaleTests {
 
     @Test func verdict_coversEveryBandAtItsEdges() {
         let expected: [(Double, String)] = [
-            (0, "Rock Bottom"), (0.1, "Unlistenable"), (0.9, "Unlistenable"),
-            (1, "Bad"), (1.9, "Bad"), (2, "Weak"), (2.9, "Weak"),
+            (0, "Unlistenable"), (0.9, "Unlistenable"),
+            (1, "Awful"), (1.9, "Awful"), (2, "Weak"), (2.9, "Weak"),
             (3, "Forgettable"), (4.4, "Forgettable"), (4.5, "Average"), (5.4, "Average"),
             (5.5, "Decent"), (6.9, "Decent"), (7, "Good"), (7.4, "Good"),
             (7.5, "Great"), (7.9, "Great"), (8, "Excellent"), (8.4, "Excellent"),
