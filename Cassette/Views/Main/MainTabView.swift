@@ -16,7 +16,7 @@ struct MainTabView: View {
     @Namespace private var playerZoom
     private let fullPlayerZoomID = "full-player"
 
-    private enum AppTab: Hashable { case home, discover, search }
+    private enum AppTab: Hashable { case home, collection, discover, search }
 
     private var hasTrack: Bool {
         container?.playerState.currentTrack != nil || container?.playerState.isLiveStream == true
@@ -82,6 +82,12 @@ struct MainTabView: View {
             Tab("Home", systemImage: "house.fill", value: AppTab.home) {
                 NavigationStack(path: $homePath) {
                     HomeView()
+                }
+            }
+
+            Tab("Collection", systemImage: "square.grid.3x3.fill", value: AppTab.collection) {
+                NavigationStack {
+                    CollectionView()
                 }
             }
 

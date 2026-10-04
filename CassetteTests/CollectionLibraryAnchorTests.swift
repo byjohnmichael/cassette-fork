@@ -171,34 +171,72 @@ struct LibraryZoomLevelTests {
         #expect(abs(total - 390) < 0.001)
     }
 
-    @Test("a pinch short of the threshold springs back")
-    func pinchSpringsBack() {
-        #expect(LibraryPinch.resolve(from: .albums, magnification: 1.1) == .albums)
-        #expect(LibraryPinch.resolve(from: .albums, magnification: 0.9) == .albums)
+    @Test("a point in the grid finds the tile under it")
+    func indexAtPoint() {
+        let width: CGFloat = 390
+        let pitch = LibraryGridMetrics.tileSide(columns: 4, containerWidth: width) + LibraryGridMetrics.tileSpacing
+        #expect(LibraryGridMetrics.index(at: CGPoint(x: 1, y: 1), columns: 4, containerWidth: width) == 0)
+        #expect(LibraryGridMetrics.index(at: CGPoint(x: pitch * 2 + 1, y: 1), columns: 4, containerWidth: width) == 2)
+        #expect(LibraryGridMetrics.index(at: CGPoint(x: 1, y: pitch * 3 + 1), columns: 4, containerWidth: width) == 12)
+        #expect(LibraryGridMetrics.index(at: CGPoint(x: width - 0.5, y: pitch + 1), columns: 4, containerWidth: width) == 7)
+        #expect(LibraryGridMetrics.index(at: CGPoint(x: -1, y: 1), columns: 4, containerWidth: width) == nil)
+        #expect(LibraryGridMetrics.index(at: CGPoint(x: 1, y: -1), columns: 4, containerWidth: width) == nil)
+        #expect(LibraryGridMetrics.index(at: CGPoint(x: width, y: 1), columns: 4, containerWidth: width) == nil)
     }
 
-    @Test("past the threshold a pinch commits in the mapped direction")
+    @Test("a tile's row top is the inverse of the point lookup")
+    func rowTop() {
+        let width: CGFloat = 390
+        for index in [0, 3, 4, 9, 17] {
+            let top = LibraryGridMetrics.rowTop(of: index, columns: 4, containerWidth: width)
+            let found = LibraryGridMetrics.index(at: CGPoint(x: 1, y: top + 1), columns: 4, containerWidth: width)
+            #expect(found == index / 4 * 4)
+        }
+    }
+
+    @Test("spreading makes tiles larger, as in Photos")
+    func spreadDirection() {
+        #expect(LibraryPinch.candidate(from: .songs, magnification: 1.2) == .albums)
+        #expect(LibraryPinch.candidate(from: .albums, magnification: 1.2) == .artists)
+        #expect(LibraryPinch.candidate(from: .artists, magnification: 0.8) == .albums)
+        #expect(LibraryPinch.candidate(from: .albums, magnification: 1) == nil)
+    }
+
+    @Test("a pinch short of halfway springs back")
+    func pinchSpringsBack() {
+        #expect(LibraryPinch.resolve(from: .albums, magnification: 1.1) == .albums)
+        #expect(LibraryPinch.resolve(from: .albums, magnification: 0.95) == .albums)
+    }
+
+    @Test("past halfway a pinch commits in the mapped direction")
     func pinchCommits() {
-        let spreadTarget: LibraryZoomLevel = LibraryPinch.spreadZoomsIn ? .songs : .artists
-        let pinchTarget: LibraryZoomLevel = LibraryPinch.spreadZoomsIn ? .artists : .songs
-        #expect(LibraryPinch.resolve(from: .albums, magnification: 1.5) == spreadTarget)
-        #expect(LibraryPinch.resolve(from: .albums, magnification: 0.6) == pinchTarget)
+        #expect(LibraryPinch.resolve(from: .albums, magnification: 1.25) == .artists)
+        #expect(LibraryPinch.resolve(from: .albums, magnification: 0.85) == .songs)
     }
 
     @Test("pinching past the end of the levels stays put")
     func pinchAtEnds() {
-        let innermost: LibraryZoomLevel = .songs
-        let spreadAtInnermost = LibraryPinch.spreadZoomsIn ? 2.0 : 0.5
-        #expect(LibraryPinch.resolve(from: innermost, magnification: spreadAtInnermost) == innermost)
+        #expect(LibraryPinch.candidate(from: .artists, magnification: 2) == nil)
+        #expect(LibraryPinch.resolve(from: .artists, magnification: 2) == .artists)
+        #expect(LibraryPinch.resolve(from: .songs, magnification: 0.5) == .songs)
     }
 
-    @Test("progress is symmetric for spread and pinch and caps at 1")
-    func pinchProgress() {
-        let spread = LibraryPinch.progress(magnification: 1.14)
-        let pinch = LibraryPinch.progress(magnification: 1 / 1.14)
-        #expect(abs(spread - pinch) < 0.0001)
-        #expect(spread > 0 && spread < 1)
-        #expect(LibraryPinch.progress(magnification: 1) == 0)
-        #expect(LibraryPinch.progress(magnification: 3) == 1)
+    @Test("spreading by the tiles' size ratio completes the step, so tiles track the fingers")
+    func progressTracksTileSize() {
+        // Albums are 4 across, artists 3: an artist tile is 4/3 the size of an album tile.
+        #expect(abs(LibraryPinch.progress(from: .albums, magnification: 4.0 / 3.0) - 1) < 0.0001)
+        let half = LibraryPinch.progress(from: .albums, magnification: (4.0 / 3.0).squareRoot())
+        #expect(abs(half - 0.5) < 0.0001)
+        #expect(LibraryPinch.progress(from: .albums, magnification: 3) == 1)
+        #expect(LibraryPinch.progress(from: .albums, magnification: 1) == 0)
+        #expect(LibraryPinch.progress(from: .artists, magnification: 2) == 0)
+    }
+
+    @Test("past the last level the grid stretches a little, never far")
+    func rubberBand() {
+        #expect(LibraryPinch.rubberBandScale(magnification: 1) == 1)
+        #expect(LibraryPinch.rubberBandScale(magnification: 1.05) > 1)
+        #expect(LibraryPinch.rubberBandScale(magnification: 10) < 1 + LibraryPinch.rubberBand * 1.2)
+        #expect(LibraryPinch.rubberBandScale(magnification: 0.1) > 1 - LibraryPinch.rubberBand * 1.2)
     }
 }
