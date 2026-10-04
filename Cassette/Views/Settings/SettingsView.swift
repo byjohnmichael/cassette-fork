@@ -306,6 +306,16 @@ struct DownloadsSectionView: View {
 
     var body: some View {
         Section {
+            NavigationLink {
+                ManageDownloadsView()
+            } label: {
+                Label {
+                    Text("Manage Downloads")
+                } icon: {
+                    SettingsIcon(systemImage: "square.and.arrow.down.on.square.fill", color: .blue)
+                }
+            }
+
             LabeledContent {
                 Text(vm.usedBytesFormatted)
                     .foregroundStyle(.secondary)
