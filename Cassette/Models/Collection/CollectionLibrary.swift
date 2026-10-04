@@ -4,14 +4,13 @@
 // See LICENSE file in the project root for full license information.
 
 import Foundation
-import SwiftSonic
 
 /// One artist in the collection grid. `albums` and `songs` are the artist's contiguous runs in
 /// `CollectionLibrary.albums` / `.songs` — the library is one flat flow, so a run is a range.
 nonisolated struct CollectionArtist: Identifiable, Hashable, Sendable {
     let id: String
     let name: String
-    /// Artist photo id for `getCoverArt` (Navidrome serves `ar-…` ids). Nil when the server has none.
+    /// Artist photo id for the artwork cache. Nil when there is none to show.
     let coverArtId: String?
     let albums: Range<Int>
     let songs: Range<Int>
@@ -24,8 +23,7 @@ nonisolated struct CollectionAlbum: Identifiable, Hashable, Sendable {
     let coverArtId: String?
     let artistIndex: Int
     let songs: Range<Int>
-    /// From the server's album record when there is one, so a partially loaded song list does not
-    /// shrink the count shown on the album page.
+    /// Downloaded songs on this album — the collection shows only what is on the device.
     let songCount: Int
     let duration: TimeInterval
 }
@@ -242,122 +240,133 @@ nonisolated struct CollectionLibrary: Sendable {
     }
 }
 
+// MARK: - Input
+
+/// One downloaded track as the collection sees it: the playback model plus the fields the
+/// ordering needs that `DisplayableSong` does not carry. Those extra fields are optional because
+/// downloads made so far never recorded them — every rule below has a fallback for nil.
+nonisolated struct CollectionTrackRecord: Sendable, Hashable {
+    let song: DisplayableSong
+    let discNumber: Int?
+    /// Release year of the track's album.
+    let year: Int?
+    /// The album's artist, which differs from `song.artistId` on compilations and guest tracks.
+    let albumArtistId: String?
+    let albumArtistName: String?
+
+    init(
+        song: DisplayableSong,
+        discNumber: Int? = nil,
+        year: Int? = nil,
+        albumArtistId: String? = nil,
+        albumArtistName: String? = nil
+    ) {
+        self.song = song
+        self.discNumber = discNumber
+        self.year = year
+        self.albumArtistId = albumArtistId
+        self.albumArtistName = albumArtistName
+    }
+}
+
+extension CollectionTrackRecord {
+    @MainActor
+    init(from track: DownloadedTrack) {
+        self.init(song: DisplayableSong(from: track))
+    }
+}
+
 // MARK: - Building
 
 nonisolated extension CollectionLibrary {
-    /// Builds the ordered library from the server's artist, album and song lists.
+    /// Stand-in artist for an album whose tracks name several artists and no album artist.
+    static let variousArtistsID = "collection:various-artists"
+
+    /// Builds the ordered library from downloaded tracks. Albums and artists are derived from the
+    /// tracks themselves, since only what is on the device is shown.
     ///
-    /// Songs are grouped under their album, and albums under the album's artist — so a compilation
-    /// track stays with its album rather than scattering across guest artists. Records that point
-    /// at a parent the server did not list (a song whose album is missing, an album whose artist
-    /// is missing) get a stand-in parent built from their own metadata instead of being dropped.
-    /// Artists with no albums are left out: they have nothing to show at the other two levels.
-    static func build(
-        artists artistDTOs: [ArtistID3],
-        albums albumDTOs: [AlbumID3],
-        songs songDTOs: [Song],
-        locale: Locale = .current
-    ) -> CollectionLibrary {
+    /// Each album goes under one artist, so a compilation stays together instead of scattering
+    /// across its guests: the album artist when a track records one, else the single artist all
+    /// its tracks share, else a "Various Artists" stand-in.
+    static func build(tracks: [CollectionTrackRecord], locale: Locale = .current) -> CollectionLibrary {
         let order = CollectionSortOrder(locale: locale)
 
-        // Artists, keyed by id.
-        var artistDrafts: [String: ArtistDraft] = [:]
-        for dto in artistDTOs where artistDrafts[dto.id] == nil {
-            artistDrafts[dto.id] = ArtistDraft(id: dto.id, name: dto.name, coverArtId: dto.coverArt)
-        }
-
-        // Albums, keyed by id, each attached to an artist.
-        var albumDrafts: [String: AlbumDraft] = [:]
-        for dto in albumDTOs where albumDrafts[dto.id] == nil {
-            let artistID = ensureArtist(id: dto.artistId, name: dto.artist, in: &artistDrafts)
-            albumDrafts[dto.id] = AlbumDraft(
-                id: dto.id, title: dto.name, year: dto.year, coverArtId: dto.coverArt,
-                artistID: artistID, declaredSongCount: dto.songCount,
-                declaredDuration: TimeInterval(dto.duration)
-            )
-        }
-
-        // Songs, each attached to an album.
+        // Group tracks into albums; order does not matter yet, everything is sorted below.
         var seenSongs = Set<String>()
-        for dto in songDTOs where seenSongs.insert(dto.id).inserted {
-            let albumID: String
-            if let id = dto.albumId, albumDrafts[id] != nil {
-                albumID = id
-            } else {
-                let artistID = ensureArtist(id: dto.artistId, name: dto.artist, in: &artistDrafts)
-                albumID = dto.albumId ?? "unlisted-album:\(artistID)|\(dto.album ?? "")"
-                if albumDrafts[albumID] == nil {
-                    albumDrafts[albumID] = AlbumDraft(
-                        id: albumID, title: dto.album ?? String(localized: "Unknown Album"),
-                        year: dto.year, coverArtId: dto.coverArt, artistID: artistID,
-                        declaredSongCount: nil, declaredDuration: nil
-                    )
-                }
-            }
-            albumDrafts[albumID]?.songs.append(dto)
+        var albumDrafts: [String: AlbumDraft] = [:]
+        for record in tracks where seenSongs.insert(record.song.id).inserted {
+            let key = albumKey(for: record.song)
+            albumDrafts[key, default: AlbumDraft(id: key)].tracks.append(record)
         }
 
-        // Albums per artist.
+        // Resolve each album's artist, title, year and cover; collect artists.
+        var artistNames: [String: String] = [:]
         var albumIDsByArtist: [String: [String]] = [:]
-        for album in albumDrafts.values {
-            albumIDsByArtist[album.artistID, default: []].append(album.id)
+        for key in albumDrafts.keys {
+            guard var draft = albumDrafts[key] else { continue }
+            let artist = albumArtist(of: draft.tracks)
+            draft.artistID = artist.id
+            draft.title = draft.tracks.lazy.compactMap(\.song.albumName).first
+                ?? String(localized: "Unknown Album")
+            draft.year = draft.tracks.compactMap(\.year).min()
+            draft.coverArtId = draft.tracks.lazy.compactMap(\.song.coverArtId).first
+            albumDrafts[key] = draft
+            if artistNames[artist.id] == nil { artistNames[artist.id] = artist.name }
+            albumIDsByArtist[artist.id, default: []].append(key)
         }
 
-        let sortedArtists = artistDrafts.values
-            .filter { albumIDsByArtist[$0.id] != nil }
-            .sorted { order.artistPrecedes($0.name, $0.id, $1.name, $1.id) }
+        let sortedArtistIDs = artistNames.keys.sorted {
+            order.artistPrecedes(artistNames[$0] ?? "", $0, artistNames[$1] ?? "", $1)
+        }
 
         var artists: [CollectionArtist] = []
         var albums: [CollectionAlbum] = []
         var songs: [CollectionSong] = []
-        artists.reserveCapacity(sortedArtists.count)
+        artists.reserveCapacity(sortedArtistIDs.count)
         albums.reserveCapacity(albumDrafts.count)
         songs.reserveCapacity(seenSongs.count)
 
-        for artist in sortedArtists {
+        for artistID in sortedArtistIDs {
             let artistIndex = artists.count
             let albumStart = albums.count
             let songStart = songs.count
 
-            let artistAlbums = (albumIDsByArtist[artist.id] ?? [])
+            let artistAlbums = (albumIDsByArtist[artistID] ?? [])
                 .compactMap { albumDrafts[$0] }
-                .map { draft -> AlbumDraft in
-                    var draft = draft
-                    // An album with no year of its own takes its earliest song's.
-                    if draft.year == nil { draft.year = draft.songs.compactMap(\.year).min() }
-                    return draft
+                .sorted {
+                    order.albumPrecedes(year: $0.year, title: $0.title, id: $0.id,
+                                        year: $1.year, title: $1.title, id: $1.id)
                 }
-                .sorted { order.albumPrecedes($0, $1) }
 
             for album in artistAlbums {
                 let albumIndex = albums.count
-                let ordered = album.songs.sorted { order.songPrecedes($0, $1) }
+                let ordered = album.tracks.sorted { order.songPrecedes($0, $1) }
                 let songStartForAlbum = songs.count
-                for dto in ordered {
+                for record in ordered {
                     songs.append(CollectionSong(
-                        song: DisplayableSong(from: dto),
-                        discNumber: dto.discNumber,
+                        song: record.song,
+                        discNumber: record.discNumber,
                         albumIndex: albumIndex,
                         artistIndex: artistIndex
                     ))
                 }
-                let loadedDuration = ordered.reduce(TimeInterval(0)) { $0 + TimeInterval($1.duration ?? 0) }
                 albums.append(CollectionAlbum(
                     id: album.id,
                     title: album.title,
                     year: album.year,
-                    coverArtId: album.coverArtId ?? ordered.first?.coverArt,
+                    coverArtId: album.coverArtId,
                     artistIndex: artistIndex,
                     songs: songStartForAlbum..<songs.count,
-                    songCount: album.declaredSongCount ?? ordered.count,
-                    duration: album.declaredDuration ?? loadedDuration
+                    songCount: ordered.count,
+                    duration: ordered.reduce(TimeInterval(0)) { $0 + $1.song.duration }
                 ))
             }
 
             artists.append(CollectionArtist(
-                id: artist.id,
-                name: artist.name,
-                coverArtId: artist.coverArtId,
+                id: artistID,
+                name: artistNames[artistID] ?? "",
+                // Downloads keep no artist photo; the view falls back to a monogram.
+                coverArtId: nil,
                 albums: albumStart..<albums.count,
                 songs: songStart..<songs.count
             ))
@@ -366,34 +375,41 @@ nonisolated extension CollectionLibrary {
         return CollectionLibrary(artists: artists, albums: albums, songs: songs)
     }
 
-    /// Returns the id of an artist record for `id`/`name`, creating a stand-in when the server
-    /// did not list one.
-    private static func ensureArtist(
-        id: String?, name: String?, in drafts: inout [String: ArtistDraft]
-    ) -> String {
-        let displayName = name ?? String(localized: "Unknown Artist")
-        let key = id ?? "unlisted-artist:\(displayName)"
-        if drafts[key] == nil {
-            drafts[key] = ArtistDraft(id: key, name: displayName, coverArtId: nil)
+    /// The album a track belongs to. A track with no album id is grouped with the other tracks
+    /// that name the same artist and album.
+    private static func albumKey(for song: DisplayableSong) -> String {
+        if let albumId = song.albumId { return albumId }
+        let artist = song.artistId ?? song.artist ?? ""
+        return "collection:unlisted-album:\(artist)|\(song.albumName ?? "")"
+    }
+
+    private static func albumArtist(of tracks: [CollectionTrackRecord]) -> (id: String, name: String) {
+        if let record = tracks.first(where: { $0.albumArtistId != nil }), let id = record.albumArtistId {
+            return (id, record.albumArtistName ?? record.song.artist ?? String(localized: "Unknown Artist"))
         }
-        return key
+        // No album artist recorded: use the track artist when every track agrees on it.
+        let keys = Set(tracks.map { record -> String in
+            if let id = record.song.artistId { return id }
+            guard let name = record.song.artist else { return "" }
+            return "collection:artist:\(name)"
+        })
+        if keys.count == 1, let key = keys.first {
+            let name = tracks.lazy.compactMap(\.song.artist).first
+            guard !key.isEmpty, let name else {
+                return ("collection:unknown-artist", String(localized: "Unknown Artist"))
+            }
+            return (key, name)
+        }
+        return (variousArtistsID, String(localized: "Various Artists"))
     }
 
-    private struct ArtistDraft {
+    private struct AlbumDraft {
         let id: String
-        let name: String
-        let coverArtId: String?
-    }
-
-    fileprivate struct AlbumDraft {
-        let id: String
-        let title: String
+        var tracks: [CollectionTrackRecord] = []
+        var artistID = ""
+        var title = ""
         var year: Int?
-        let coverArtId: String?
-        let artistID: String
-        let declaredSongCount: Int?
-        let declaredDuration: TimeInterval?
-        var songs: [Song] = []
+        var coverArtId: String?
     }
 }
 
@@ -440,10 +456,6 @@ nonisolated struct CollectionSortOrder: Sendable {
     }
 
     /// Release year, oldest first; albums with no year go after dated ones. Ties by title, then id.
-    fileprivate func albumPrecedes(_ lhs: CollectionLibrary.AlbumDraft, _ rhs: CollectionLibrary.AlbumDraft) -> Bool {
-        albumPrecedes(year: lhs.year, title: lhs.title, id: lhs.id, year: rhs.year, title: rhs.title, id: rhs.id)
-    }
-
     func albumPrecedes(
         year lhsYear: Int?, title lhsTitle: String, id lhsID: String,
         year rhsYear: Int?, title rhsTitle: String, id rhsID: String
@@ -462,15 +474,15 @@ nonisolated struct CollectionSortOrder: Sendable {
 
     /// Track-list order: disc, then track. A missing disc number counts as disc 1; a missing track
     /// number sorts after numbered tracks on its disc. Ties by title, then id.
-    func songPrecedes(_ lhs: Song, _ rhs: Song) -> Bool {
+    func songPrecedes(_ lhs: CollectionTrackRecord, _ rhs: CollectionTrackRecord) -> Bool {
         let lhsDisc = lhs.discNumber ?? 1, rhsDisc = rhs.discNumber ?? 1
         if lhsDisc != rhsDisc { return lhsDisc < rhsDisc }
-        let lhsTrack = lhs.track ?? Int.max, rhsTrack = rhs.track ?? Int.max
+        let lhsTrack = lhs.song.trackNumber ?? Int.max, rhsTrack = rhs.song.trackNumber ?? Int.max
         if lhsTrack != rhsTrack { return lhsTrack < rhsTrack }
-        switch compare(lhs.title, rhs.title) {
+        switch compare(lhs.song.title, rhs.song.title) {
         case .orderedAscending: return true
         case .orderedDescending: return false
-        case .orderedSame: return lhs.id < rhs.id
+        case .orderedSame: return lhs.song.id < rhs.song.id
         }
     }
 }

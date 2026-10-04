@@ -5,7 +5,6 @@
 
 import Testing
 import Foundation
-import SwiftSonic
 @testable import Cassette
 
 /// The item under the user's fingers must stay under them across a level change. These pin the
@@ -14,23 +13,15 @@ import SwiftSonic
 struct CollectionLibraryAnchorTests {
     typealias F = CollectionFixtures
 
-    /// Alpha: 1999 "First" (2 songs), 2005 "Second" (1 song)
-    /// Bravo: 2010 "Only" (2 songs)
-    private let lib = F.build(
-        artists: [F.artist("alpha", "Alpha"), F.artist("bravo", "Bravo")],
-        albums: [
-            F.album("second", "Second", artist: "alpha", year: 2005),
-            F.album("first", "First", artist: "alpha", year: 1999),
-            F.album("only", "Only", artist: "bravo", year: 2010),
-        ],
-        songs: [
-            F.song("second-1", album: "second", track: 1),
-            F.song("first-2", album: "first", track: 2),
-            F.song("first-1", album: "first", track: 1),
-            F.song("only-2", album: "only", track: 2),
-            F.song("only-1", album: "only", track: 1),
-        ]
-    )
+    /// Alpha: 1999 "first" (2 songs), 2005 "second" (1 song)
+    /// Bravo: 2010 "only" (2 songs)
+    private let lib = F.build([
+        F.track("second-1", album: "second", artist: "alpha", artistName: "Alpha", track: 1, year: 2005),
+        F.track("first-2", album: "first", artist: "alpha", artistName: "Alpha", track: 2, year: 1999),
+        F.track("first-1", album: "first", artist: "alpha", artistName: "Alpha", track: 1, year: 1999),
+        F.track("only-2", album: "only", artist: "bravo", artistName: "Bravo", track: 2, year: 2010),
+        F.track("only-1", album: "only", artist: "bravo", artistName: "Bravo", track: 1, year: 2010),
+    ])
 
     // MARK: Zooming in
 
@@ -104,42 +95,6 @@ struct CollectionLibraryAnchorTests {
 
     // MARK: Edges
 
-    @Test("an album whose songs did not load anchors on the next song instead of failing")
-    func emptyAlbumFallsForward() {
-        let lib = F.build(
-            artists: [F.artist("1", "Alpha")],
-            albums: [
-                F.album("empty", "Empty", artist: "1", year: 1990),
-                F.album("full", "Full", artist: "1", year: 2000),
-            ],
-            songs: [F.song("full-1", album: "full", track: 1)]
-        )
-        #expect(lib.anchor(.album("empty"), to: .songs) == .song("full-1"))
-    }
-
-    @Test("a trailing album with no songs anchors on the last song")
-    func trailingEmptyAlbumClamps() {
-        let lib = F.build(
-            artists: [F.artist("1", "Alpha")],
-            albums: [
-                F.album("full", "Full", artist: "1", year: 1990),
-                F.album("empty", "Empty", artist: "1", year: 2000),
-            ],
-            songs: [F.song("full-1", album: "full", track: 1)]
-        )
-        #expect(lib.anchor(.album("empty"), to: .songs) == .song("full-1"))
-    }
-
-    @Test("no songs at all: nothing to land on")
-    func noTargets() {
-        let lib = F.build(
-            artists: [F.artist("1", "Alpha")],
-            albums: [F.album("a", "A", artist: "1", year: 2000)],
-            songs: []
-        )
-        #expect(lib.anchor(.album("a"), to: .songs) == nil)
-    }
-
     @Test("unknown ids and out-of-range indices map to nil")
     func invalidInput() {
         #expect(lib.anchor(.album("nope"), to: .songs) == nil)
@@ -160,16 +115,15 @@ struct CollectionLibraryAnchorTests {
     func subtitles() {
         #expect(lib.subtitle(forTopIndex: 1, level: .artists) == "Bravo")
         #expect(lib.subtitle(forTopIndex: 1, level: .albums) == "Alpha")
-        #expect(lib.subtitle(forTopIndex: 2, level: .songs) == "Alpha · Second")
+        #expect(lib.subtitle(forTopIndex: 2, level: .songs) == "Alpha · second")
     }
 
     @Test("tiles carry spoken labels")
     func accessibilityLabels() {
-        let lib = F.build(
-            artists: [F.artist("nh", "Neon Harbor")],
-            albums: [F.album("nf", "Night Ferry", artist: "nh", year: 2024)],
-            songs: [F.song("s", album: "nf", track: 1, title: "Lanterns")]
-        )
+        let lib = F.build([
+            F.track("s", album: "nf", albumName: "Night Ferry", artist: "nh", artistName: "Neon Harbor",
+                    track: 1, year: 2024, title: "Lanterns"),
+        ])
         #expect(lib.accessibilityLabel(at: 0, level: .albums) == "Album, Night Ferry by Neon Harbor, 2024")
         #expect(lib.accessibilityLabel(at: 0, level: .artists) == "Artist, Neon Harbor, 1 album")
         #expect(lib.accessibilityLabel(at: 0, level: .songs) == "Song, Lanterns by Neon Harbor, from Night Ferry")
